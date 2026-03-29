@@ -172,34 +172,20 @@
       opacity:1, shadow:true, shadowColor:"rgba(0,0,0,0.5)", shadowBlur:6,
       showLeader:false
     };
-    const THEMES = {
-      dark: {
-        appBg:"#07101f", headerBg:"#040c1a", headerBdr:"#0f2040",
-        toolbarBg:"#050e1c", toolbarBdr:"#0a1e30", canvasBg:"#040c18",
-        panelBg:"#050e1c", panelBdr:"#0a1e30", cardBg:"#081828", cardBdr:"#0f2a40",
-        inputBg:"#0a1628", inputBdr:"#1e3a5f", text:"#ccd6f6",
-        textMuted:"#3a6080", textLabel:"#2a5070", accent:"#4da6ff",
-        accentBg:"rgba(0,102,255,0.2)", btnPrimary:"linear-gradient(135deg,#004bb5,#0066ff)",
-        btnGreen:"linear-gradient(135deg,#005500,#00aa00)", scrollThumb:"#1a3050",
-        tabActive:"#4da6ff", tabInactive:"#3a6080", srowHover:"#0d1f38",
-        toastBg:"#040c1a", toastBdr:"#0066ff", toastText:"#4da6ff",
-      },
-      light: {
-        appBg:"#f0f4f8", headerBg:"#1e3a5f", headerBdr:"#2a4f7a",
-        toolbarBg:"#ffffff", toolbarBdr:"#d1d9e6", canvasBg:"#e2e8f0",
-        panelBg:"#ffffff", panelBdr:"#d1d9e6", cardBg:"#f8fafc", cardBdr:"#d1d9e6",
-        inputBg:"#f1f5f9", inputBdr:"#cbd5e1", text:"#1e293b",
-        textMuted:"#64748b", textLabel:"#475569", accent:"#0052cc",
-        accentBg:"rgba(0,82,204,0.12)", btnPrimary:"linear-gradient(135deg,#0047b3,#0066ff)",
-        btnGreen:"linear-gradient(135deg,#15803d,#16a34a)", scrollThumb:"#cbd5e1",
-        tabActive:"#0052cc", tabInactive:"#64748b", srowHover:"#f1f5f9",
-        toastBg:"#1e293b", toastBdr:"#0052cc", toastText:"#e2e8f0",
-      }
+    const THEME = {
+      appBg:"#07101f", headerBg:"#040c1a", headerBdr:"#0f2040",
+      toolbarBg:"#050e1c", toolbarBdr:"#0a1e30", canvasBg:"#040c18",
+      panelBg:"#050e1c", panelBdr:"#0a1e30", cardBg:"#081828", cardBdr:"#0f2a40",
+      inputBg:"#0a1628", inputBdr:"#1e3a5f", text:"#ccd6f6",
+      textMuted:"#3a6080", textLabel:"#2a5070", accent:"#4da6ff",
+      accentBg:"rgba(0,102,255,0.2)", btnPrimary:"linear-gradient(135deg,#004bb5,#0066ff)",
+      btnGreen:"linear-gradient(135deg,#005500,#00aa00)", scrollThumb:"#1a3050",
+      tabActive:"#4da6ff", tabInactive:"#3a6080", srowHover:"#0d1f38",
+      toastBg:"#040c1a", toastBdr:"#0066ff", toastText:"#4da6ff",
     };
 
     function BallooningTool() {
-      const [themeKey, setThemeKey] = useState("dark");
-      const T = THEMES[themeKey];
+      const T = THEME;
       const [image, setImage] = useState(null);
       const [balloons, setBalloons] = useState([]);
       const [selected, setSelected] = useState(null);
@@ -224,7 +210,6 @@
       const overlayRef  = useRef(null);
       const imgElRef   = useRef(null);
       const fileRef    = useRef(null);
-      const sessionFileRef = useRef(null);
       const mmRef      = useRef(null);
       const muRef      = useRef(null);
       const modeRef     = useRef(mode);
@@ -239,78 +224,7 @@
       const resetTpl = () => setTemplate({...DEFAULT_BALLOON});
       const showToast = (msg,dur=2200) => { setToast(msg); setTimeout(()=>setToast(""),dur); };
 
-      // Auto-save to localStorage whenever balloons or image change
-      useEffect(()=>{
-        if(!image && !balloons.length) return;
-        try {
-          const session = { version:"1.0", createdBy:"RT", image, balloons, counter, timestamp: new Date().toISOString() };
-          localStorage.setItem("dwg_ballooning_autosave", JSON.stringify(session));
-        } catch(e) { /* storage full – silently ignore */ }
-      },[image, balloons, counter]);
-
-      // ── Save / Load / Export ─────────────────────────────────────────────────
-      const saveSession = () => {
-        if(!image && !balloons.length) { showToast("⚠️ Nothing to save"); return; }
-        try {
-          const session = { version:"1.0", createdBy:"RT", image, balloons, counter, timestamp: new Date().toISOString() };
-          localStorage.setItem("dwg_ballooning_session", JSON.stringify(session));
-          showToast("✅ Session saved to browser!");
-        } catch(e) { showToast("❌ Save failed – storage may be full"); }
-      };
-
-      const loadSession = () => {
-        try {
-          const data = localStorage.getItem("dwg_ballooning_session") || localStorage.getItem("dwg_ballooning_autosave");
-          if(!data) { showToast("⚠️ No saved session found"); return; }
-          const session = JSON.parse(data);
-          setImage(session.image || null);
-          setBalloons(session.balloons || []);
-          setCounter(session.counter || Math.max(...(session.balloons||[]).map(b=>b.num), 0) + 1);
-          setZoom(1); setPanPos({x:0,y:0}); setSelected(null);
-          showToast("✅ Session loaded!");
-        } catch(e) { showToast("❌ Load failed: " + e.message); }
-      };
-
-      const downloadSession = () => {
-        const session = { version:"1.0", createdBy:"RT", image, balloons, counter, timestamp: new Date().toISOString() };
-        const blob = new Blob([JSON.stringify(session, null, 2)], { type:"application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = "ballooning_session.json";
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url), 10000);
-        showToast("✅ Session file downloaded!");
-      };
-
-      const importSession = async(file) => {
-        if(!file) return;
-        try {
-          const text = await file.text();
-          const session = JSON.parse(text);
-          if(!Array.isArray(session.balloons)) { showToast("❌ Invalid session file"); return; }
-          setImage(session.image || null);
-          setBalloons(session.balloons);
-          setCounter(session.counter || Math.max(...session.balloons.map(b=>b.num), 0) + 1);
-          setZoom(1); setPanPos({x:0,y:0}); setSelected(null);
-          showToast("✅ Session imported!");
-        } catch(e) { showToast("❌ Import failed: " + e.message); }
-      };
-
-      const exportBOM = () => {
-        if(!balloons.length) { showToast("⚠️ No balloons to export"); return; }
-        const header = ["#","Description","Shape","Size(px)","Fill Color","Border Color","X(%)","Y(%)"];
-        const rows = [...balloons].sort((a,b)=>a.num-b.num).map(b=>[
-          b.num, b.description||"", b.type, b.size, b.bgColor, b.borderColor, b.x.toFixed(1), b.y.toFixed(1)
-        ]);
-        const csv = [header,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-        const blob = new Blob([csv], { type:"text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = "balloon_bom.csv";
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url), 10000);
-        showToast("✅ BOM exported as CSV!");
-      };
+      // ── Export ──────────────────────────────────────────────────────────────
 
       const clearAllBalloons = () => {
         if(!balloons.length) return;
@@ -338,6 +252,9 @@
         window.addEventListener("keydown",onKey);
         return ()=>window.removeEventListener("keydown",onKey);
       },[]);
+
+      // Keep counter always in sync with balloon count so serial numbers stay correct
+      useEffect(()=>{ setCounter(balloons.length+1); },[balloons]);
 
       mmRef.current = useCallback((e)=>{
         if(!dragging||!overlayRef.current) return;
@@ -420,9 +337,7 @@
         const tpl=templateRef.current;
         setBalloons(p=>{
           const appended=[...p,{...tpl,id,num:0,description:"",x,y}];
-          const renumbered=appended.map((b,i)=>({...b,num:i+1}));
-          setCounter(renumbered.length+1);
-          return renumbered;
+          return appended.map((b,i)=>({...b,num:i+1}));
         });
         setSelected(id);
       },[]);
@@ -661,9 +576,6 @@
               </div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <button onClick={()=>setThemeKey(k=>k==="dark"?"light":"dark")} style={{background:themeKey==="dark"?"rgba(255,255,255,0.1)":"rgba(0,0,0,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:20,color:"#fff",padding:"5px 14px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>
-                {themeKey==="dark"?"☀️ LIGHT MODE":"🌙 DARK MODE"}
-              </button>
               <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{balloons.length} balloons</span>
               <button className="tb" onClick={download} disabled={!image||!balloons.length} style={{background:image&&balloons.length?T.btnGreen:"transparent",border:`1px solid ${image&&balloons.length?"transparent":T.inputBdr}`,borderRadius:6,color:image&&balloons.length?"#fff":T.textLabel,padding:"6px 14px",cursor:image&&balloons.length?"pointer":"not-allowed",fontSize:11,fontFamily:"inherit",fontWeight:700}}>⬇ EXPORT PNG</button>
             </div>
@@ -714,14 +626,6 @@
               <Btn onClick={sendBack}>⬇ BACK</Btn>
               <button className="tb" onClick={deleteSel} style={{background:"transparent",border:"1px solid rgba(220,38,38,.4)",borderRadius:5,color:"#dc2626",padding:"5px 10px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>🗑 DEL</button>
             </>}
-            <div style={{width:1,height:20,background:T.toolbarBdr}}/>
-            <Btn onClick={saveSession}>💾 SAVE</Btn>
-            <Btn onClick={loadSession}>📂 LOAD</Btn>
-            <Btn onClick={downloadSession} disabled={!image&&!balloons.length}>⬇ SAVE JSON</Btn>
-            <input ref={sessionFileRef} type="file" accept=".json,application/json" style={{display:"none"}} onChange={e=>{importSession(e.target.files[0]);e.target.value="";}}/>
-            <Btn onClick={()=>sessionFileRef.current.click()}>📤 IMPORT JSON</Btn>
-            <div style={{width:1,height:20,background:T.toolbarBdr}}/>
-            <Btn onClick={exportBOM} disabled={!balloons.length}>📋 BOM CSV</Btn>
           </div>
 
           {/* BODY */}
@@ -758,7 +662,7 @@
                   <div style={{transform:`translate(${panPos.x}px,${panPos.y}px) scale(${zoom})`,transformOrigin:"center center",transition:panning?"none":"transform 0.15s ease",position:"relative",display:"inline-block",userSelect:"none"}}
                     onClick={e=>{if(!e.target.closest(".balloon-dot"))setSelected(null);}}>
                     <img ref={imgElRef} src={image} alt="drawing" draggable={false}
-                      style={{display:"block",maxWidth:"80vw",maxHeight:"75vh",borderRadius:3,boxShadow:themeKey==="light"?"0 4px 20px rgba(0,0,0,0.2)":"0 4px 20px rgba(0,0,0,0.5)"}}
+                      style={{display:"block",maxWidth:"80vw",maxHeight:"75vh",borderRadius:3,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}
                       onLoad={e=>setNaturalSize({w:e.target.naturalWidth,h:e.target.naturalHeight})}/>
                     <div ref={overlayRef} onClick={addBalloon} style={{position:"absolute",inset:0}}>
                       {balloons.map(b=><div key={b.id} className="balloon-dot"><BalloonDot b={b}/></div>)}
