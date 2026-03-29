@@ -3,64 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dwg Ballooning</title>
-    <script>
-        // Features: save/load functionality, undo/redo, batch select, snap-to-grid, export PDF, keyboard shortcuts panel, balloon statistics
-        let versionInfo = "Version 1.0\nCreated By RT";
-        let balloons = [];
-        let commandHistory = [];
-        let redoHistory = [];
-
-        function saveBalloons() {
-            localStorage.setItem('balloons', JSON.stringify(balloons));
-            alert('Balloons saved!');
-        }
-
-        function loadBalloons() {
-            const savedBalloons = JSON.parse(localStorage.getItem('balloons')) || [];
-            balloons = savedBalloons;
-            alert('Balloons loaded!');
-        }
-
-        function undo() {
-            if (commandHistory.length) {
-                redoHistory.push(commandHistory.pop());
-                // Logic to update the UI with the last state from command history
-            }
-        }
-
-        function redo() {
-            if (redoHistory.length) {
-                commandHistory.push(redoHistory.pop());
-                // Logic to restore the last undone action
-            }
-        }
-
-        function exportToPDF() {
-            // Placeholder for PDF export functionality
-            alert('Exporting to PDF (not implemented).');
-        }
-
-        function showKeyboardShortcuts() {
-            alert('Keyboard Shortcuts\nCtrl+S: Save\nCtrl+Z: Undo\nCtrl+Y: Redo\nCtrl+E: Export to PDF');
-        }
-
-        function showBalloonStatistics() {
-            alert(`Total Balloons: ${balloons.length}`);
-        }
-    </script>
+    <title>Dwg Ballooning - v2.0.0</title>
+    <script src="script.js"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Dwg Ballooning Tool</h1>
-    <button onclick="saveBalloons()">Save</button>
-    <button onclick="loadBalloons()">Load</button>
-    <button onclick="undo()">Undo</button>
-    <button onclick="redo()">Redo</button>
-    <button onclick="exportToPDF()">Export to PDF</button>
-    <button onclick="showKeyboardShortcuts()">Keyboard Shortcuts</button>
-    <button onclick="showBalloonStatistics()">Balloon Statistics</button>
-    <div>
-        <p>${versionInfo}</p>
-    </div>
+    <header>
+        <h1>Dwg Ballooning - Enhanced Version</h1>
+        <small>Created By RT</small>
+    </header>
+    <main>
+        <div id="canvas-container">
+            <!-- Canvas for drawing -->
+            <canvas id="drawingCanvas"></canvas>
+        </div>
+        <div id="controls">
+            <button id="save">Save JSON</button>
+            <button id="load">Load JSON</button>
+            <button id="undo">Undo (Ctrl+Z)</button>
+            <button id="redo">Redo (Ctrl+Y)</button>
+            <button id="batchSelect">Batch Select</button>
+            <button id="snapToGrid">Snap to Grid</button>
+            <button id="copy">Copy (Ctrl+C)</button>
+            <button id="paste">Paste (Ctrl+V)</button>
+            <button id="rotate">Rotate</button>
+        </div>
+        <div id="statistics">
+            <p id="statsPanel"></p>
+        </div>
+    </main>
+    <footer>
+        <p>Enhancements: Version v2.0.0 includes enhanced saving/loading, undo/redo, batch selection, keyboard shortcuts, grid display, and rotation support.</p>
+    </footer>
 </body>
 </html>
