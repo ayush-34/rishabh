@@ -1,39 +1,804 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dwg Ballooning - v2.0.0</title>
-    <script src="script.js"></script>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dwg Ballooning</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%;overflow:hidden}
+  </style>
 </head>
 <body>
-    <header>
-        <h1>Dwg Ballooning - Enhanced Version</h1>
-        <small>Created By RT</small>
-    </header>
-    <main>
-        <div id="canvas-container">
-            <!-- Canvas for drawing -->
-            <canvas id="drawingCanvas"></canvas>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useCallback, useEffect } = React;
+
+    // ── Password Gate ─────────────────────────────────────────────────────────
+    const CORRECT_PASSWORD = "PPAP@2024"; // ← Change this to your desired password
+
+    function PasswordGate({ onUnlock }) {
+      const [pwd, setPwd]       = useState("");
+      const [error, setError]   = useState("");
+      const [show, setShow]     = useState(false);
+      const [shake, setShake]   = useState(false);
+      const inputRef            = useRef(null);
+
+      useEffect(() => { inputRef.current?.focus(); }, []);
+
+      const attempt = () => {
+        if (pwd === CORRECT_PASSWORD) {
+          onUnlock();
+        } else {
+          setError("Incorrect password. Please try again.");
+          setPwd("");
+          setShake(true);
+          setTimeout(() => setShake(false), 600);
+          inputRef.current?.focus();
+        }
+      };
+
+      return (
+        <div style={{
+          position:"fixed", inset:0,
+          background:"linear-gradient(135deg, #07101f 0%, #0a1628 50%, #07101f 100%)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontFamily:"'IBM Plex Mono',monospace"
+        }}>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+            @keyframes fadeup { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+            @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
+            @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(77,166,255,0.4)} 70%{box-shadow:0 0 0 14px rgba(77,166,255,0)} 100%{box-shadow:0 0 0 0 rgba(77,166,255,0)} }
+          `}</style>
+
+          {/* Background grid pattern */}
+          <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(77,166,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(77,166,255,0.03) 1px, transparent 1px)",backgroundSize:"40px 40px",pointerEvents:"none"}}/>
+
+          <div style={{
+            animation:"fadeup .5s ease",
+            background:"rgba(8,24,40,0.95)",
+            border:"1px solid #1e3a5f",
+            borderRadius:16,
+            padding:"44px 48px",
+            width:380,
+            maxWidth:"90vw",
+            boxShadow:"0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(77,166,255,0.1)",
+            textAlign:"center",
+            animation: shake ? "shake .5s ease" : "fadeup .5s ease",
+          }}>
+            {/* Logo */}
+            <div style={{
+              width:64, height:64,
+              background:"linear-gradient(135deg,#0047cc,#00aaff)",
+              borderRadius:16, margin:"0 auto 20px",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:28, animation:"pulse-ring 2s infinite"
+            }}>📐</div>
+
+            <div style={{fontWeight:700, fontSize:18, color:"#fff", letterSpacing:"0.08em", marginBottom:6}}>
+              DWG BALLOONING
+            </div>
+            <div style={{fontSize:10, color:"#3a6080", letterSpacing:"0.2em", marginBottom:32}}>
+              ENTER PASSWORD TO ACCESS
+            </div>
+
+            {/* Password input */}
+            <div style={{position:"relative", marginBottom:16}}>
+              <input
+                ref={inputRef}
+                type={show ? "text" : "password"}
+                value={pwd}
+                onChange={e => { setPwd(e.target.value); setError(""); }}
+                onKeyDown={e => e.key === "Enter" && attempt()}
+                placeholder="Enter password"
+                style={{
+                  width:"100%", padding:"12px 44px 12px 16px",
+                  background:"#0a1628", border:`1px solid ${error?"#dc2626":"#1e3a5f"}`,
+                  borderRadius:8, color:"#fff", fontSize:13,
+                  fontFamily:"inherit", outline:"none", letterSpacing:"0.1em",
+                  transition:"border-color .2s"
+                }}
+                onFocus={e => e.target.style.borderColor="#4da6ff"}
+                onBlur={e => e.target.style.borderColor=error?"#dc2626":"#1e3a5f"}
+              />
+              {/* Show/hide toggle */}
+              <button
+                onClick={() => setShow(s => !s)}
+                style={{
+                  position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                  background:"none", border:"none", color:"#3a6080",
+                  cursor:"pointer", fontSize:16, padding:2, lineHeight:1
+                }}
+              >{show ? "🙈" : "👁"}</button>
+            </div>
+
+            {/* Error message */}
+            <div style={{
+              height:18, marginBottom:16,
+              fontSize:11, color:"#ef4444",
+              opacity: error ? 1 : 0, transition:"opacity .2s"
+            }}>{error}</div>
+
+            {/* Unlock button */}
+            <button
+              onClick={attempt}
+              style={{
+                width:"100%", padding:"13px",
+                background:"linear-gradient(135deg,#004bb5,#0066ff)",
+                border:"none", borderRadius:8,
+                color:"#fff", fontSize:13, fontFamily:"inherit",
+                fontWeight:700, letterSpacing:"0.08em",
+                cursor:"pointer", transition:"opacity .15s"
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity="0.85"}
+              onMouseLeave={e => e.currentTarget.style.opacity="1"}
+            >🔓 UNLOCK</button>
+
+            <div style={{marginTop:24, fontSize:10, color:"#1e3a5f", letterSpacing:"0.1em"}}>
+              DWG BALLOONING TOOL
+            </div>
+          </div>
         </div>
-        <div id="controls">
-            <button id="save">Save JSON</button>
-            <button id="load">Load JSON</button>
-            <button id="undo">Undo (Ctrl+Z)</button>
-            <button id="redo">Redo (Ctrl+Y)</button>
-            <button id="batchSelect">Batch Select</button>
-            <button id="snapToGrid">Snap to Grid</button>
-            <button id="copy">Copy (Ctrl+C)</button>
-            <button id="paste">Paste (Ctrl+V)</button>
-            <button id="rotate">Rotate</button>
+      );
+    }
+    // ── End Password Gate ─────────────────────────────────────────────────────
+
+    const PRESET_COLORS = [
+      "#ef4444","#f97316","#f59e0b","#eab308","#22c55e","#10b981",
+      "#06b6d4","#3b82f6","#6366f1","#a855f7","#ec4899","#000000",
+      "#374151","#6b7280","#d1d5db","#ffffff"
+    ];
+    const BORDER_PRESETS = [
+      "#ffffff","#000000","#ef4444","#f59e0b","#22c55e","#3b82f6",
+      "#a855f7","#ec4899","#06b6d4","#f97316","#374151","#d1d5db"
+    ];
+    const DEFAULT_BALLOON = {
+      type:"circle", size:32,
+      bgColor:"#f59e0b", bgOpacity:1,
+      borderColor:"#ffffff", borderWidth:2, borderStyle:"solid",
+      borderGlow:false, borderGlowColor:"#0066ff", borderGlowSize:6,
+      borderDash:[],
+      textColor:"#ffffff", fontSize:13, fontWeight:"bold",
+      opacity:1, shadow:true, shadowColor:"rgba(0,0,0,0.5)", shadowBlur:6,
+      showLeader:false
+    };
+    const THEMES = {
+      dark: {
+        appBg:"#07101f", headerBg:"#040c1a", headerBdr:"#0f2040",
+        toolbarBg:"#050e1c", toolbarBdr:"#0a1e30", canvasBg:"#040c18",
+        panelBg:"#050e1c", panelBdr:"#0a1e30", cardBg:"#081828", cardBdr:"#0f2a40",
+        inputBg:"#0a1628", inputBdr:"#1e3a5f", text:"#ccd6f6",
+        textMuted:"#3a6080", textLabel:"#2a5070", accent:"#4da6ff",
+        accentBg:"rgba(0,102,255,0.2)", btnPrimary:"linear-gradient(135deg,#004bb5,#0066ff)",
+        btnGreen:"linear-gradient(135deg,#005500,#00aa00)", scrollThumb:"#1a3050",
+        tabActive:"#4da6ff", tabInactive:"#3a6080", srowHover:"#0d1f38",
+        toastBg:"#040c1a", toastBdr:"#0066ff", toastText:"#4da6ff",
+      },
+      light: {
+        appBg:"#f0f4f8", headerBg:"#1e3a5f", headerBdr:"#2a4f7a",
+        toolbarBg:"#ffffff", toolbarBdr:"#d1d9e6", canvasBg:"#e2e8f0",
+        panelBg:"#ffffff", panelBdr:"#d1d9e6", cardBg:"#f8fafc", cardBdr:"#d1d9e6",
+        inputBg:"#f1f5f9", inputBdr:"#cbd5e1", text:"#1e293b",
+        textMuted:"#64748b", textLabel:"#475569", accent:"#0052cc",
+        accentBg:"rgba(0,82,204,0.12)", btnPrimary:"linear-gradient(135deg,#0047b3,#0066ff)",
+        btnGreen:"linear-gradient(135deg,#15803d,#16a34a)", scrollThumb:"#cbd5e1",
+        tabActive:"#0052cc", tabInactive:"#64748b", srowHover:"#f1f5f9",
+        toastBg:"#1e293b", toastBdr:"#0052cc", toastText:"#e2e8f0",
+      }
+    };
+
+    function BallooningTool() {
+      const [themeKey, setThemeKey] = useState("dark");
+      const T = THEMES[themeKey];
+      const [image, setImage] = useState(null);
+      const [balloons, setBalloons] = useState([]);
+      const [selected, setSelected] = useState(null);
+      const [dragging, setDragging] = useState(null);
+      const [dragOff, setDragOff] = useState({x:0,y:0});
+      const [mode, setMode] = useState("select");
+      const [dropOver, setDropOver] = useState(false);
+      const [counter, setCounter] = useState(1);
+      const [toast, setToast] = useState("");
+      const [panel, setPanel] = useState("properties");
+      const [zoom, setZoom] = useState(1);
+      const [panPos, setPanPos] = useState({x:0,y:0});
+      const [panning, setPanning] = useState(false);
+      const [panStart, setPanStart] = useState({x:0,y:0});
+      const [template, setTemplate] = useState({...DEFAULT_BALLOON});
+      const [naturalSize, setNaturalSize] = useState({w:1,h:1});
+      const [confirmDel, setConfirmDel] = useState(false);
+      const [pdfPages, setPdfPages]   = useState([]);   // array of dataURLs per page
+      const [pdfPage,  setPdfPage]    = useState(0);    // current page index (0-based)
+      const [pdfLoading, setPdfLoading] = useState(false);
+      const canvasWrapRef = useRef(null);
+      const overlayRef  = useRef(null);
+      const imgElRef   = useRef(null);
+      const fileRef    = useRef(null);
+      const mmRef      = useRef(null);
+      const muRef      = useRef(null);
+      const modeRef     = useRef(mode);
+      const templateRef = useRef(template);
+      useEffect(()=>{ modeRef.current=mode; },[mode]);
+      useEffect(()=>{ templateRef.current=template; },[template]);
+      const ZOOM_MIN=0.25, ZOOM_MAX=4;
+      const zoomIn  = () => setZoom(z=>Math.min(+(z+0.25).toFixed(2),ZOOM_MAX));
+      const zoomOut = () => setZoom(z=>Math.max(+(z-0.25).toFixed(2),ZOOM_MIN));
+      const zoomReset = () => { setZoom(1); setPanPos({x:0,y:0}); };
+      const updTpl = (k,v) => setTemplate(p=>({...p,[k]:v}));
+      const resetTpl = () => setTemplate({...DEFAULT_BALLOON});
+      const showToast = (msg,dur=2200) => { setToast(msg); setTimeout(()=>setToast(""),dur); };
+
+      useEffect(()=>{
+        const mm=(e)=>mmRef.current?.(e);
+        const mu=(e)=>muRef.current?.(e);
+        window.addEventListener("mousemove",mm);
+        window.addEventListener("mouseup",mu);
+        return ()=>{ window.removeEventListener("mousemove",mm); window.removeEventListener("mouseup",mu); };
+      },[]);
+
+      useEffect(()=>{
+        const onKey=(e)=>{
+          if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT") return;
+          if(e.key==="+"||e.key==="="){e.preventDefault();setZoom(z=>Math.min(+(z+0.25).toFixed(2),4));}
+          if(e.key==="-"){e.preventDefault();setZoom(z=>Math.max(+(z-0.25).toFixed(2),0.25));}
+          if(e.key==="0"){e.preventDefault();setZoom(1);setPanPos({x:0,y:0});}
+          if(e.key===" "){e.preventDefault();setMode(m=>m==="pan"?"select":"pan");}
+          if(e.key==="Escape"){setMode("select");setSelected(null);}
+        };
+        window.addEventListener("keydown",onKey);
+        return ()=>window.removeEventListener("keydown",onKey);
+      },[]);
+
+      mmRef.current = useCallback((e)=>{
+        if(!dragging||!overlayRef.current) return;
+        const rect=overlayRef.current.getBoundingClientRect();
+        const x=Math.min(Math.max(((e.clientX-rect.left-dragOff.x)/rect.width)*100,0.5),99.5);
+        const y=Math.min(Math.max(((e.clientY-rect.top-dragOff.y)/rect.height)*100,0.5),99.5);
+        setBalloons(p=>p.map(b=>b.id===dragging?{...b,x,y}:b));
+      },[dragging,dragOff]);
+      muRef.current = useCallback(()=>setDragging(null),[]);
+
+      const loadFile=async(file)=>{
+        if(!file) return;
+        const isImage = file.type.startsWith("image/");
+        const isPDF   = file.type==="application/pdf";
+        if(!isImage && !isPDF){ showToast("Please upload PNG, JPG, WebP or PDF"); return; }
+
+        if(isImage){
+          const r=new FileReader();
+          r.onload=e=>{
+            setImage(e.target.result);
+            setPdfPages([]); setPdfPage(0);
+            setBalloons([]);setSelected(null);setCounter(1);setZoom(1);setPanPos({x:0,y:0});
+          };
+          r.readAsDataURL(file);
+          return;
+        }
+
+        // ── PDF handling ──────────────────────────────────────────────────────
+        setPdfLoading(true);
+        showToast("Loading PDF…", 8000);
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+          const totalPages = pdfDoc.numPages;
+          const pages = [];
+
+          for(let p=1; p<=totalPages; p++){
+            const page   = await pdfDoc.getPage(p);
+            const scale  = 2.5; // high-res render
+            const vp     = page.getViewport({scale});
+            const canvas = document.createElement("canvas");
+            canvas.width  = vp.width;
+            canvas.height = vp.height;
+            const ctx = canvas.getContext("2d");
+            await page.render({canvasContext:ctx, viewport:vp}).promise;
+            pages.push(canvas.toDataURL("image/png"));
+          }
+
+          setPdfPages(pages);
+          setPdfPage(0);
+          setImage(pages[0]);
+          setBalloons([]);setSelected(null);setCounter(1);setZoom(1);setPanPos({x:0,y:0});
+          showToast(`✅ PDF loaded — ${totalPages} page${totalPages>1?"s":""}`);
+        } catch(err) {
+          showToast("❌ PDF failed: " + err.message);
+        }
+        setPdfLoading(false);
+      };
+
+      // Switch PDF page
+      const goToPage = (idx) => {
+        if(idx<0||idx>=pdfPages.length) return;
+        setPdfPage(idx);
+        setImage(pdfPages[idx]);
+        setBalloons([]);setSelected(null);setCounter(1);setZoom(1);setPanPos({x:0,y:0});
+        showToast(`Page ${idx+1} of ${pdfPages.length}`);
+      };
+
+      const addBalloon=useCallback((e)=>{
+        if(modeRef.current!=="add"||!overlayRef.current) return;
+        // Block if clicking on an existing balloon dot
+        if(e.target.closest&&e.target.closest(".balloon-dot")) return;
+        const rect=overlayRef.current.getBoundingClientRect();
+        const x=((e.clientX-rect.left)/rect.width)*100;
+        const y=((e.clientY-rect.top)/rect.height)*100;
+        const id=Date.now();
+        const tpl=templateRef.current;
+        setBalloons(p=>{
+          const appended=[...p,{...tpl,id,num:0,description:"",x,y}];
+          const renumbered=appended.map((b,i)=>({...b,num:i+1}));
+          setCounter(renumbered.length+1);
+          return renumbered;
+        });
+        setSelected(id);
+      },[]);
+
+      // Auto-renumber: assigns 1,2,3... in current array order
+      const renum = (arr) => arr.map((b,i) => ({...b, num:i+1}));
+
+      const startDrag=(e,id)=>{
+        if(mode!=="select") return;
+        e.stopPropagation();
+        setSelected(id);
+        const rect=overlayRef.current.getBoundingClientRect();
+        const b=balloons.find(b=>b.id===id);
+        setDragging(id);
+        setDragOff({x:e.clientX-rect.left-(b.x/100)*rect.width,y:e.clientY-rect.top-(b.y/100)*rect.height});
+      };
+
+      const upd=(k,v)=>{if(!selected)return;setBalloons(p=>p.map(b=>b.id===selected?{...b,[k]:v}:b));};
+      const applyToAll=(k,v)=>{setBalloons(p=>p.map(b=>({...b,[k]:v})));showToast("Applied to all ✅");};
+
+      const deleteSel=()=>{
+        if(!selected)return;
+        setBalloons(p=>{
+          const rem=p.filter(b=>b.id!==selected).map((b,i)=>({...b,num:i+1}));
+          setCounter(rem.length+1);
+          return rem;
+        });
+        setSelected(null);
+        showToast("Deleted");
+      };
+      const duplicate=()=>{
+        if(!selected)return;
+        const b=balloons.find(b=>b.id===selected);
+        if(!b)return;
+        const nb={...b,id:Date.now(),x:Math.min(b.x+3,97),y:Math.min(b.y+3,97),num:counter};
+        setBalloons(p=>{const updated=[...p,nb].map((b,i)=>({...b,num:i+1}));setCounter(updated.length+1);return updated;});
+        setSelected(nb.id);showToast("Duplicated ✅");
+      };
+      const bringFront=()=>{if(!selected)return;setBalloons(p=>{const b=p.find(b=>b.id===selected);return [...p.filter(b=>b.id!==selected),b];});showToast("Brought to front");};
+      const sendBack=()=>{if(!selected)return;setBalloons(p=>{const b=p.find(b=>b.id===selected);return [b,...p.filter(b=>b.id!==selected)];});showToast("Sent to back");};
+      const renumber=()=>{const s=renum([...balloons]);setBalloons(s);setCounter(s.length+1);showToast("Renumbered ✅");};
+
+      const download=()=>{
+        if(!image||!balloons.length) return;
+        const imgEl=imgElRef.current;
+        const displayW=imgEl?imgEl.clientWidth:naturalSize.w;
+        const displayH=imgEl?imgEl.clientHeight:naturalSize.h;
+        const img=new Image();
+        img.onload=()=>{
+          const c=document.createElement("canvas");
+          c.width=img.width;c.height=img.height;
+          const ctx=c.getContext("2d");
+          ctx.drawImage(img,0,0);
+          const scaleX=img.width/displayW, scaleY=img.height/displayH;
+          const avgScale=(scaleX+scaleY)/2;
+          balloons.forEach(b=>{
+            const cx=(b.x/100)*img.width, cy=(b.y/100)*img.height;
+            const r=b.size*0.52*avgScale;
+            ctx.globalAlpha=b.opacity;
+            if(b.shadow){ctx.shadowColor=b.shadowColor||"rgba(0,0,0,0.5)";ctx.shadowBlur=r*0.4;}
+            if(b.borderGlow){ctx.shadowColor=b.borderGlowColor;ctx.shadowBlur=(b.borderGlowSize||6)*avgScale;}
+            const ds=()=>{
+              if(b.type==="circle"||b.type==="doublecircle"){ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);}
+              else if(b.type==="diamond"){ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx+r,cy);ctx.lineTo(cx,cy+r);ctx.lineTo(cx-r,cy);ctx.closePath();}
+              else if(b.type==="square"){ctx.beginPath();ctx.roundRect(cx-r,cy-r,r*2,r*2,r*0.15);}
+              else if(b.type==="hexagon"){ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3-Math.PI/6;ctx.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a));}ctx.closePath();}
+              else if(b.type==="triangle"){ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx+r*0.87,cy+r*0.5);ctx.lineTo(cx-r*0.87,cy+r*0.5);ctx.closePath();}
+            };
+            ds();ctx.fillStyle=b.bgColor;ctx.fill();ctx.shadowBlur=0;
+            if(b.borderWidth>0){
+              if(b.borderStyle==="dashed")ctx.setLineDash([r*0.4,r*0.2]);
+              else if(b.borderStyle==="dotted")ctx.setLineDash([r*0.1,r*0.2]);
+              ds();ctx.strokeStyle=b.borderColor;ctx.lineWidth=b.borderWidth*avgScale;ctx.stroke();
+              ctx.setLineDash([]);
+            }
+            if(b.type==="doublecircle"){ctx.beginPath();ctx.arc(cx,cy,r*0.68,0,Math.PI*2);ctx.strokeStyle=b.borderColor;ctx.lineWidth=(b.borderWidth||1)*avgScale*0.7;ctx.stroke();}
+            ctx.globalAlpha=1;ctx.shadowBlur=0;
+            ctx.fillStyle=b.textColor;ctx.font=`${b.fontWeight} ${b.fontSize*avgScale}px monospace`;
+            ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(b.num),cx,cy);
+          });
+          c.toBlob((blob)=>{
+            if(!blob){showToast("❌ Export failed");return;}
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement("a");
+            a.href=url;a.download="ballooned_drawing.png";
+            document.body.appendChild(a);a.click();document.body.removeChild(a);
+            setTimeout(()=>URL.revokeObjectURL(url),10000);
+            showToast("✅ Downloaded!");
+          },"image/png");
+        };
+        img.src=image;
+      };
+
+      const selB=balloons.find(b=>b.id===selected);
+
+      const BalloonDot=({b})=>{
+        const s=b.size,col=b.bgColor,bCol=b.borderColor,bW=b.borderWidth,bS=b.borderStyle;
+        const isSel=selected===b.id,isDrg=dragging===b.id;
+        const glowFilter=b.borderGlow?`drop-shadow(0 0 ${b.borderGlowSize||6}px ${b.borderGlowColor||"#0066ff"})`:b.shadow?`drop-shadow(0 2px 6px ${b.shadowColor||"rgba(0,0,0,0.5)"})`:"none";
+        const borderCss=bW>0?`${bW}px ${bS||"solid"} ${bCol}`:"none";
+        const ss={position:"absolute",inset:0};
+        let shapeEl;
+        if(b.type==="circle"||b.type==="doublecircle"){
+          shapeEl=<><div style={{...ss,borderRadius:"50%",background:col,border:borderCss,opacity:b.bgOpacity||1}}/>{b.type==="doublecircle"&&<div style={{position:"absolute",inset:"22%",borderRadius:"50%",background:"transparent",border:`${Math.max(1,bW-0.5)}px solid ${bCol}`}}/>}</>;
+        } else if(b.type==="diamond"){
+          shapeEl=<div style={{position:"absolute",width:s*0.7,height:s*0.7,background:col,border:borderCss,transform:"rotate(45deg)",opacity:b.bgOpacity||1}}/>;
+        } else if(b.type==="square"){
+          shapeEl=<div style={{...ss,background:col,border:borderCss,borderRadius:4,opacity:b.bgOpacity||1}}/>;
+        } else if(b.type==="hexagon"){
+          const pts=[0,1,2,3,4,5].map(i=>{const a=i*60-30,r=s/2-bW;return `${s/2+r*Math.cos(a*Math.PI/180)},${s/2+r*Math.sin(a*Math.PI/180)}`;}).join(" ");
+          shapeEl=<svg style={{...ss,overflow:"visible"}} width={s} height={s}><polygon points={pts} fill={col} stroke={bCol} strokeWidth={bW} strokeDasharray={bS==="dashed"?`${s*0.2},${s*0.1}`:bS==="dotted"?`${s*0.05},${s*0.12}`:"none"}/></svg>;
+        } else if(b.type==="triangle"){
+          const h=s*0.87,pts=`${s/2},0 ${s},${h} 0,${h}`;
+          shapeEl=<svg style={{...ss,overflow:"visible"}} width={s} height={s}><polygon points={pts} fill={col} stroke={bCol} strokeWidth={bW}/></svg>;
+        }
+        return (
+          <div onMouseDown={e=>startDrag(e,b.id)} style={{position:"absolute",left:`${b.x}%`,top:`${b.y}%`,transform:"translate(-50%,-50%)",width:s,height:s,display:"flex",alignItems:"center",justifyContent:"center",opacity:b.opacity,filter:glowFilter,cursor:mode==="select"?(isDrg?"grabbing":"grab"):"crosshair",zIndex:isSel?60:10,userSelect:"none",transition:isDrg?"none":"filter .1s",animation:"pop .18s ease"}}>
+            {shapeEl}
+            <span style={{position:"relative",color:b.textColor,fontWeight:b.fontWeight,fontSize:b.fontSize,fontFamily:"monospace",lineHeight:1,pointerEvents:"none",textShadow:"0 1px 3px rgba(0,0,0,.5)"}}>{b.num}</span>
+            {isSel&&<div style={{position:"absolute",inset:-5,borderRadius:b.type==="circle"||b.type==="doublecircle"?"50%":b.type==="diamond"?"0":4,border:"2px dashed #4da6ff",pointerEvents:"none",animation:"spin-ring 3s linear infinite"}}/>}
+          </div>
+        );
+      };
+
+      const ShapePreview=({b,size=56})=>{
+        const s=size,col=b.bgColor,bCol=b.borderColor,bW=b.borderWidth;
+        const borderCss=bW>0?`${bW}px ${b.borderStyle||"solid"} ${bCol}`:"none";
+        const glow=b.borderGlow?{filter:`drop-shadow(0 0 ${b.borderGlowSize||6}px ${b.borderGlowColor||"#0066ff"})`}:{};
+        return(
+          <div style={{width:s,height:s,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",opacity:b.opacity,...glow}}>
+            {(b.type==="circle"||b.type==="doublecircle")&&<><div style={{position:"absolute",inset:0,borderRadius:"50%",background:col,border:borderCss}}/>{b.type==="doublecircle"&&<div style={{position:"absolute",inset:"22%",borderRadius:"50%",border:`${Math.max(1,bW)}px solid ${bCol}`}}/>}</>}
+            {b.type==="diamond"&&<div style={{position:"absolute",width:s*0.7,height:s*0.7,background:col,border:borderCss,transform:"rotate(45deg)"}}/>}
+            {b.type==="square"&&<div style={{position:"absolute",inset:2,background:col,border:borderCss,borderRadius:3}}/>}
+            {b.type==="hexagon"&&<svg style={{position:"absolute"}} width={s} height={s}><polygon points={[0,1,2,3,4,5].map(i=>{const a=i*60-30,rr=s/2-bW;return `${s/2+rr*Math.cos(a*Math.PI/180)},${s/2+rr*Math.sin(a*Math.PI/180)}`;}).join(" ")} fill={col} stroke={bCol} strokeWidth={bW}/></svg>}
+            {b.type==="triangle"&&<svg style={{position:"absolute"}} width={s} height={s}><polygon points={`${s/2},${bW} ${s-bW},${s-bW} ${bW},${s-bW}`} fill={col} stroke={bCol} strokeWidth={bW}/></svg>}
+            <span style={{position:"relative",color:b.textColor,fontWeight:b.fontWeight,fontSize:b.fontSize*0.9,fontFamily:"monospace",lineHeight:1}}>{b.num}</span>
+          </div>
+        );
+      };
+
+      const Label=({children,mt=10})=><div style={{fontSize:9,color:T.textLabel,letterSpacing:"0.1em",marginBottom:5,marginTop:mt}}>{children}</div>;
+      const Row=({children,gap=6})=><div style={{display:"flex",gap,alignItems:"center",flexWrap:"wrap"}}>{children}</div>;
+      const Inp=({val,onChange,type="text",min,max,step,w="100%"})=>(
+        <input type={type} value={val} min={min} max={max} step={step} onChange={e=>onChange(type==="number"?Number(e.target.value):e.target.value)}
+          style={{background:T.inputBg,border:`1px solid ${T.inputBdr}`,borderRadius:5,color:T.text,padding:"5px 8px",fontSize:11,fontFamily:"inherit",outline:"none",width:w}}
+          onFocus={e=>e.target.style.borderColor=T.accent} onBlur={e=>e.target.style.borderColor=T.inputBdr}/>
+      );
+      const Slider=({label,val,min,max,step=0.1,onChange,unit="",applyKey})=>{
+        const decimals = step < 1 ? (step.toString().split(".")[1]||"").length : 0;
+        const display  = typeof val==="number" ? val.toFixed(decimals) : val;
+        return (
+          <div style={{marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontSize:9,color:T.textLabel,letterSpacing:"0.1em"}}>{label}</div>
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                {applyKey&&<button onClick={()=>applyToAll(applyKey,val)} style={{background:"none",border:`1px solid ${T.inputBdr}`,borderRadius:3,color:T.textMuted,cursor:"pointer",fontSize:8,padding:"1px 5px",fontFamily:"inherit"}}>ALL</button>}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:7}}>
+              <input type="range" min={min} max={max} step={step} value={val}
+                onChange={e=>onChange(Number(e.target.value))}
+                style={{flex:1,accentColor:T.accent,height:4,cursor:"pointer"}}/>
+              <input type="number" min={min} max={max} step={step} value={display}
+                onChange={e=>{
+                  const v=parseFloat(e.target.value);
+                  if(!isNaN(v)) onChange(Math.min(Math.max(v,min),max));
+                }}
+                style={{
+                  width:52, background:T.inputBg, border:`1px solid ${T.inputBdr}`,
+                  borderRadius:5, color:T.accent, padding:"3px 6px",
+                  fontSize:11, fontFamily:"inherit", outline:"none",
+                  textAlign:"center", fontWeight:700,
+                  MozAppearance:"textfield"
+                }}
+                onFocus={e=>e.target.style.borderColor=T.accent}
+                onBlur={e=>e.target.style.borderColor=T.inputBdr}
+              />
+              {unit&&<span style={{fontSize:10,color:T.textMuted,minWidth:14}}>{unit}</span>}
+            </div>
+          </div>
+        );
+      };
+      const ColorPicker=({label,value,onChange,presets=PRESET_COLORS,applyKey})=>(
+        <div style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+            <div style={{fontSize:9,color:T.textLabel,letterSpacing:"0.1em"}}>{label}</div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:18,height:18,borderRadius:3,background:value,border:`1px solid ${T.inputBdr}`}}/>
+              <span style={{fontSize:10,color:T.textMuted}}>{value}</span>
+              {applyKey&&<button onClick={()=>applyToAll(applyKey,value)} style={{background:"none",border:`1px solid ${T.inputBdr}`,borderRadius:3,color:T.textMuted,cursor:"pointer",fontSize:8,padding:"1px 5px",fontFamily:"inherit"}}>ALL</button>}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:3,marginBottom:5}}>
+            {presets.map(c=><div key={c} onClick={()=>onChange(c)} style={{width:"100%",paddingBottom:"100%",borderRadius:3,background:c,cursor:"pointer",border:value===c?`2px solid ${T.accent}`:`1px solid ${T.inputBdr}`,transition:"transform .1s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.15)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}/>)}
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input type="color" value={value} onChange={e=>onChange(e.target.value)} style={{width:32,height:28,border:`1px solid ${T.inputBdr}`,borderRadius:4,cursor:"pointer",padding:1}}/>
+            <input type="text" value={value} onChange={e=>onChange(e.target.value)} placeholder="#rrggbb"
+              style={{flex:1,background:T.inputBg,border:`1px solid ${T.inputBdr}`,borderRadius:4,color:T.text,padding:"4px 7px",fontSize:11,fontFamily:"monospace",outline:"none"}}
+              onFocus={e=>e.target.style.borderColor=T.accent} onBlur={e=>e.target.style.borderColor=T.inputBdr}/>
+          </div>
         </div>
-        <div id="statistics">
-            <p id="statsPanel"></p>
+      );
+      const Btn=({onClick,disabled,children,style={}})=>(
+        <button onClick={onClick} disabled={disabled} style={{border:`1px solid ${T.inputBdr}`,borderRadius:5,background:"transparent",color:disabled?T.textLabel:T.textMuted,cursor:disabled?"not-allowed":"pointer",fontSize:10,fontFamily:"inherit",padding:"5px 9px",...style}}
+          onMouseEnter={e=>{if(!disabled)e.currentTarget.style.color=T.accent;}} onMouseLeave={e=>{e.currentTarget.style.color=disabled?T.textLabel:T.textMuted;}}>
+          {children}
+        </button>
+      );
+
+      return (
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",background:T.appBg,height:"100vh",color:T.text,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <style>{`
+            *{box-sizing:border-box;margin:0;padding:0}
+            ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${T.scrollThumb};border-radius:2px}
+            @keyframes pop{0%{transform:translate(-50%,-50%) scale(0.1);opacity:0}70%{transform:translate(-50%,-50%) scale(1.15)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+            @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+            @keyframes spin-ring{to{transform:rotate(360deg)}}
+            .tb:hover{opacity:.82}.tb:active{transform:scale(.97)}
+            .pnl-tab:hover{color:${T.tabActive}!important}
+            .srow-item:hover{background:${T.srowHover}!important}
+          `}</style>
+
+          {/* HEADER */}
+          <div style={{background:T.headerBg,borderBottom:`1px solid ${T.headerBdr}`,padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:32,height:32,background:"linear-gradient(135deg,#0047cc,#00aaff)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>📐</div>
+              <div>
+                <div style={{fontWeight:700,fontSize:13,color:"#fff",letterSpacing:"0.06em"}}>PPAP DRAWING BALLOONING</div>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.5)",letterSpacing:"0.12em"}}>PLACE · STYLE · REPOSITION · EXPORT</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <button onClick={()=>setThemeKey(k=>k==="dark"?"light":"dark")} style={{background:themeKey==="dark"?"rgba(255,255,255,0.1)":"rgba(0,0,0,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:20,color:"#fff",padding:"5px 14px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>
+                {themeKey==="dark"?"☀️ LIGHT MODE":"🌙 DARK MODE"}
+              </button>
+              <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{balloons.length} balloons</span>
+              <button className="tb" onClick={download} disabled={!image||!balloons.length} style={{background:image&&balloons.length?T.btnGreen:"transparent",border:`1px solid ${image&&balloons.length?"transparent":T.inputBdr}`,borderRadius:6,color:image&&balloons.length?"#fff":T.textLabel,padding:"6px 14px",cursor:image&&balloons.length?"pointer":"not-allowed",fontSize:11,fontFamily:"inherit",fontWeight:700}}>⬇ EXPORT PNG</button>
+            </div>
+          </div>
+
+          {/* TOOLBAR */}
+          <div style={{background:T.toolbarBg,borderBottom:`1px solid ${T.toolbarBdr}`,padding:"6px 16px",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",flexShrink:0}}>
+            <input ref={fileRef} type="file" accept="image/*,.pdf,application/pdf" style={{display:"none"}} onChange={e=>loadFile(e.target.files[0])}/>
+            <button className="tb" onClick={()=>fileRef.current.click()} style={{background:T.btnPrimary,border:"none",borderRadius:6,color:"#fff",padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>📁 UPLOAD (IMG / PDF)</button>
+            {image&&<button className="tb" onClick={()=>setConfirmDel(true)} style={{background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.4)",borderRadius:6,color:"#dc2626",padding:"5px 11px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>🗑 DELETE DWG</button>}
+            <div style={{width:1,height:20,background:T.toolbarBdr}}/>
+            {[["select","✋ SELECT"],["add","➕ ADD BALLOON"],["pan","🖐 PAN"]].map(([m,l])=>(
+              <button key={m} onClick={()=>setMode(m)} style={{padding:"5px 11px",borderRadius:5,border:"1px solid",borderColor:mode===m?T.accent:T.cardBdr,background:mode===m?T.accentBg:"transparent",color:mode===m?T.accent:T.textMuted,cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>{l}</button>
+            ))}
+            {mode==="add"&&<>
+              <div style={{width:1,height:28,background:T.toolbarBdr}}/>
+              <div style={{display:"flex",alignItems:"center",gap:6,background:T.cardBg,border:`1px solid ${T.accent}44`,borderRadius:7,padding:"4px 10px 4px 7px"}}>
+                <div style={{fontSize:9,color:T.accent,letterSpacing:"0.1em",fontWeight:700}}>NEXT:</div>
+                <select value={template.type} onChange={e=>updTpl("type",e.target.value)} style={{background:T.inputBg,border:`1px solid ${T.inputBdr}`,borderRadius:4,color:T.text,padding:"3px 5px",fontSize:10,fontFamily:"inherit",cursor:"pointer",outline:"none"}}>
+                  {["circle","doublecircle","diamond","square","hexagon","triangle"].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
+                </select>
+                <span style={{fontSize:9,color:T.textMuted}}>Sz</span>
+                <input type="number" value={template.size} min={16} max={80} onChange={e=>updTpl("size",Number(e.target.value))} style={{width:40,background:T.inputBg,border:`1px solid ${T.inputBdr}`,borderRadius:4,color:T.text,padding:"3px 4px",fontSize:10,fontFamily:"inherit",outline:"none",textAlign:"center"}}/>
+                <span style={{fontSize:9,color:T.textMuted}}>Fill</span>
+                <input type="color" value={template.bgColor} onChange={e=>updTpl("bgColor",e.target.value)} style={{width:26,height:22,border:`1px solid ${T.inputBdr}`,borderRadius:4,cursor:"pointer",padding:1}}/>
+                <span style={{fontSize:9,color:T.textMuted}}>Bdr</span>
+                <input type="color" value={template.borderColor} onChange={e=>updTpl("borderColor",e.target.value)} style={{width:26,height:22,border:`1px solid ${T.inputBdr}`,borderRadius:4,cursor:"pointer",padding:1}}/>
+                <input type="number" value={template.borderWidth} min={0} max={10} onChange={e=>updTpl("borderWidth",Number(e.target.value))} style={{width:30,background:T.inputBg,border:`1px solid ${T.inputBdr}`,borderRadius:4,color:T.text,padding:"3px 4px",fontSize:10,fontFamily:"inherit",outline:"none",textAlign:"center"}}/>
+                <span style={{fontSize:9,color:T.textMuted}}>Txt</span>
+                <input type="color" value={template.textColor} onChange={e=>updTpl("textColor",e.target.value)} style={{width:26,height:22,border:`1px solid ${T.inputBdr}`,borderRadius:4,cursor:"pointer",padding:1}}/>
+                <div style={{width:template.size*0.65,height:template.size*0.65,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",filter:template.shadow?"drop-shadow(0 2px 4px rgba(0,0,0,.5))":"none"}}>
+                  {(template.type==="circle"||template.type==="doublecircle")&&<><div style={{position:"absolute",inset:0,borderRadius:"50%",background:template.bgColor,border:`${template.borderWidth}px solid ${template.borderColor}`}}/>{template.type==="doublecircle"&&<div style={{position:"absolute",inset:"22%",borderRadius:"50%",border:`1px solid ${template.borderColor}`}}/>}</>}
+                  {template.type==="diamond"&&<div style={{position:"absolute",width:"70%",height:"70%",background:template.bgColor,border:`${template.borderWidth}px solid ${template.borderColor}`,transform:"rotate(45deg)"}}/>}
+                  {template.type==="square"&&<div style={{position:"absolute",inset:1,background:template.bgColor,border:`${template.borderWidth}px solid ${template.borderColor}`,borderRadius:2}}/>}
+                  {template.type==="hexagon"&&<svg style={{position:"absolute",width:"100%",height:"100%"}} viewBox="0 0 30 30"><polygon points="15,2 27,8 27,22 15,28 3,22 3,8" fill={template.bgColor} stroke={template.borderColor} strokeWidth={template.borderWidth}/></svg>}
+                  {template.type==="triangle"&&<svg style={{position:"absolute",width:"100%",height:"100%"}} viewBox="0 0 30 30"><polygon points="15,2 28,28 2,28" fill={template.bgColor} stroke={template.borderColor} strokeWidth={template.borderWidth}/></svg>}
+                  <span style={{position:"relative",color:template.textColor,fontWeight:template.fontWeight,fontSize:template.fontSize*0.55,fontFamily:"monospace",lineHeight:1}}>N</span>
+                </div>
+                <button onClick={resetTpl} style={{background:"none",border:`1px solid ${T.inputBdr}`,borderRadius:4,color:T.textMuted,cursor:"pointer",fontSize:9,padding:"3px 6px",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color=T.textMuted}>↺</button>
+              </div>
+            </>}
+            <div style={{width:1,height:20,background:T.toolbarBdr}}/>
+            <Btn onClick={renumber} disabled={!balloons.length}>🔢 RENUMBER</Btn>
+            {selB&&<>
+              <Btn onClick={duplicate}>⧉ DUP</Btn>
+              <Btn onClick={bringFront}>⬆ FRONT</Btn>
+              <Btn onClick={sendBack}>⬇ BACK</Btn>
+              <button className="tb" onClick={deleteSel} style={{background:"transparent",border:"1px solid rgba(220,38,38,.4)",borderRadius:5,color:"#dc2626",padding:"5px 10px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>🗑 DEL</button>
+            </>}
+          </div>
+
+          {/* BODY */}
+          <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+            {/* Canvas */}
+            <div ref={canvasWrapRef} style={{flex:1,position:"relative",overflow:"hidden",background:T.canvasBg,cursor:panning?"grabbing":mode==="pan"?"grab":mode==="add"?"crosshair":"default"}}
+              onDragOver={e=>{e.preventDefault();setDropOver(true);}} onDragLeave={()=>setDropOver(false)}
+              onDrop={e=>{e.preventDefault();setDropOver(false);loadFile(e.dataTransfer.files[0]);}}
+              onWheel={e=>{e.preventDefault();const d=e.deltaY>0?-0.15:0.15;setZoom(z=>Math.min(Math.max(+(z+d).toFixed(2),ZOOM_MIN),ZOOM_MAX));}}
+              onMouseDown={e=>{if(e.button===1||mode==="pan"){e.preventDefault();setPanning(true);setPanStart({x:e.clientX-panPos.x,y:e.clientY-panPos.y});}}}
+              onMouseMove={e=>{if(panning)setPanPos({x:e.clientX-panStart.x,y:e.clientY-panStart.y});}}
+              onMouseUp={()=>setPanning(false)} onMouseLeave={()=>setPanning(false)}>
+              {image&&<>
+                <div style={{position:"absolute",bottom:16,left:"50%",transform:"translateX(-50%)",zIndex:100,display:"flex",alignItems:"center",gap:4,background:T.cardBg,border:`1px solid ${T.cardBdr}`,borderRadius:30,padding:"5px 10px",boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                  <button onClick={zoomOut} disabled={zoom<=ZOOM_MIN} style={{width:26,height:26,borderRadius:"50%",border:`1px solid ${T.inputBdr}`,background:"transparent",color:zoom<=ZOOM_MIN?T.textLabel:T.accent,cursor:zoom<=ZOOM_MIN?"not-allowed":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>−</button>
+                  {[0.5,0.75,1,1.5,2,3].map(z=><button key={z} onClick={()=>setZoom(z)} style={{padding:"3px 7px",borderRadius:12,border:"1px solid",borderColor:Math.abs(zoom-z)<0.05?T.accent:T.inputBdr,background:Math.abs(zoom-z)<0.05?T.accentBg:"transparent",color:Math.abs(zoom-z)<0.05?T.accent:T.textMuted,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:700}}>{z===1?"100%":z*100+"%"}</button>)}
+                  <button onClick={zoomIn} disabled={zoom>=ZOOM_MAX} style={{width:26,height:26,borderRadius:"50%",border:`1px solid ${T.inputBdr}`,background:"transparent",color:zoom>=ZOOM_MAX?T.textLabel:T.accent,cursor:zoom>=ZOOM_MAX?"not-allowed":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>+</button>
+                  <div style={{width:1,height:16,background:T.inputBdr,margin:"0 2px"}}/>
+                  <button onClick={zoomReset} style={{padding:"3px 8px",borderRadius:12,border:`1px solid ${T.inputBdr}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700}}>FIT</button>
+                </div>
+                <div style={{position:"absolute",top:10,right:10,zIndex:100,background:T.cardBg,border:`1px solid ${T.cardBdr}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.accent,fontWeight:700,pointerEvents:"none"}}>{Math.round(zoom*100)}%</div>
+              </>}
+              {!image?(
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,border:`2px dashed ${dropOver?T.accent:T.cardBdr}`,borderRadius:14,padding:"56px 72px",background:dropOver?T.accentBg:"transparent",transition:"all .2s"}}>
+                    <div style={{fontSize:52}}>📐</div>
+                    <div style={{color:T.accent,fontSize:15,fontWeight:700}}>UPLOAD YOUR DRAWING</div>
+                    <div style={{color:T.textMuted,fontSize:11,textAlign:"center",lineHeight:2.2}}>Drag & drop or click <strong style={{color:T.accent}}>UPLOAD</strong><br/>PNG · JPG · WebP · <strong style={{color:T.accent}}>PDF</strong><br/>Multi-page PDFs supported<br/>Then use <strong style={{color:T.accent}}>➕ ADD BALLOON</strong><br/><br/>⌨️ Shortcuts: +/- zoom · 0 fit · Space pan · Esc select</div>
+                    <button className="tb" onClick={()=>fileRef.current.click()} style={{background:T.btnPrimary,border:"none",borderRadius:7,color:"#fff",padding:"9px 22px",cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:700}}>📁 Browse Files</button>
+                  </div>
+                </div>
+              ):(
+                <div style={{position:"absolute",inset:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <div style={{transform:`translate(${panPos.x}px,${panPos.y}px) scale(${zoom})`,transformOrigin:"center center",transition:panning?"none":"transform 0.15s ease",position:"relative",display:"inline-block",userSelect:"none"}}
+                    onClick={e=>{if(!e.target.closest(".balloon-dot"))setSelected(null);}}>
+                    <img ref={imgElRef} src={image} alt="drawing" draggable={false}
+                      style={{display:"block",maxWidth:"80vw",maxHeight:"75vh",borderRadius:3,boxShadow:themeKey==="light"?"0 4px 20px rgba(0,0,0,0.2)":"0 4px 20px rgba(0,0,0,0.5)"}}
+                      onLoad={e=>setNaturalSize({w:e.target.naturalWidth,h:e.target.naturalHeight})}/>
+                    <div ref={overlayRef} onClick={addBalloon} style={{position:"absolute",inset:0}}>
+                      {balloons.map(b=><div key={b.id} className="balloon-dot"><BalloonDot b={b}/></div>)}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {dropOver&&image&&<div style={{position:"absolute",inset:0,background:"rgba(0,40,100,.7)",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:90}}><div style={{color:"#4da6ff",fontSize:15,fontWeight:700}}>DROP TO REPLACE</div></div>}
+            </div>
+
+            {/* RIGHT PANEL */}
+            <div style={{width:285,background:T.panelBg,borderLeft:`1px solid ${T.panelBdr}`,display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden"}}>
+              <div style={{padding:"7px 10px",borderBottom:`1px solid ${T.panelBdr}`,fontSize:10,color:T.textLabel,letterSpacing:"0.1em",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>BALLOONS — {balloons.length}</span>
+                {selB&&<span style={{color:T.accent}}>#{selB.num} selected</span>}
+              </div>
+              <div style={{maxHeight:120,overflowY:"auto",borderBottom:`1px solid ${T.panelBdr}`,padding:5}}>
+                {balloons.length===0?<div style={{color:T.textLabel,fontSize:11,textAlign:"center",padding:"12px 0"}}>No balloons — use ➕ ADD BALLOON</div>
+                  :[...balloons].sort((a,b)=>a.num-b.num).map(b=>(
+                    <div key={b.id} className="srow-item" onClick={()=>setSelected(b.id)} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:6,marginBottom:2,cursor:"pointer",border:"1px solid",borderColor:selected===b.id?T.accent:"transparent",background:selected===b.id?T.accentBg:"transparent"}}>
+                      <ShapePreview b={{...b,size:24,fontSize:10}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:11,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.description||<span style={{color:T.textLabel,fontStyle:"italic"}}>no desc</span>}</div>
+                        <div style={{fontSize:9,color:T.textMuted}}>{b.type} · {b.size}px</div>
+                      </div>
+                      <button onClick={e=>{e.stopPropagation();setBalloons(p=>{const rem=p.filter(x=>x.id!==b.id).map((x,i)=>({...x,num:i+1}));setCounter(rem.length+1);return rem;});if(selected===b.id)setSelected(null);}} style={{background:"none",border:"none",color:T.textLabel,cursor:"pointer",fontSize:12,padding:2}} onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color=T.textLabel}>✕</button>
+                    </div>
+                  ))}
+              </div>
+              {selB?(<>
+                <div style={{display:"flex",borderBottom:`1px solid ${T.panelBdr}`,flexShrink:0}}>
+                  {[["properties","⚙ Props"],["border","⬡ Border"],["style","🎨 Fill"],["text","T Text"],["position","📍 Pos"]].map(([id,lbl])=>(
+                    <button key={id} className="pnl-tab" onClick={()=>setPanel(id)} style={{flex:1,padding:"6px 2px",border:"none",borderBottom:panel===id?`2px solid ${T.accent}`:"2px solid transparent",background:"transparent",color:panel===id?T.tabActive:T.tabInactive,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700,letterSpacing:"0.04em",marginBottom:-1}}>{lbl}</button>
+                  ))}
+                </div>
+                <div style={{flex:1,overflowY:"auto",padding:"4px 12px 16px"}}>
+                  {panel==="properties"&&<>
+                    <div style={{display:"flex",justifyContent:"center",padding:"12px 0 8px"}}>
+                      <div style={{background:T.cardBg,border:`1px solid ${T.cardBdr}`,borderRadius:10,padding:"12px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+                        <ShapePreview b={selB} size={64}/><div style={{fontSize:9,color:T.textMuted}}>LIVE PREVIEW</div>
+                      </div>
+                    </div>
+                    <button onClick={()=>{const {id,num,description,x,y,...spec}=selB;setTemplate(spec);showToast("✅ Set as template!");}} style={{width:"100%",padding:"7px",borderRadius:6,border:`1px solid ${T.accent}`,background:T.accentBg,color:T.accent,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:700,marginBottom:8}}>📌 SET AS NEXT BALLOON TEMPLATE</button>
+                    <Label mt={4}>BALLOON NUMBER</Label>
+                    <Inp val={selB.num} type="number" min={1} onChange={v=>upd("num",v)}/>
+                    <Label>DESCRIPTION</Label>
+                    <input value={selB.description} onChange={e=>upd("description",e.target.value)} placeholder="e.g. Ø12±0.1" style={{width:"100%",background:T.inputBg,border:`1px solid ${T.inputBdr}`,borderRadius:5,color:T.text,padding:"6px 8px",fontSize:11,fontFamily:"inherit",outline:"none"}} onFocus={e=>e.target.style.borderColor=T.accent} onBlur={e=>e.target.style.borderColor=T.inputBdr}/>
+                    <Label>SHAPE</Label>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4}}>
+                      {[["circle","● Circle"],["doublecircle","◎ Double"],["diamond","◆ Diamond"],["square","■ Square"],["hexagon","⬡ Hex"],["triangle","▲ Tri"]].map(([t,l])=>(
+                        <button key={t} onClick={()=>upd("type",t)} style={{padding:"6px 3px",borderRadius:5,border:"1px solid",borderColor:selB.type===t?T.accent:T.cardBdr,background:selB.type===t?T.accentBg:"transparent",color:selB.type===t?T.accent:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700,textAlign:"center"}}>{l}</button>
+                      ))}
+                    </div>
+                    <Slider label="SIZE (px)" val={selB.size} min={16} max={80} step={0.5} onChange={v=>upd("size",v)} unit="px" applyKey="size"/>
+                    <Slider label="OPACITY" val={selB.opacity} min={0} max={1} step={0.01} onChange={v=>upd("opacity",v)} applyKey="opacity"/>
+                    <Label>OPTIONS</Label>
+                    <Row gap={12}>{[["shadow","Shadow"],["borderGlow","Glow"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:10,color:T.text}}><input type="checkbox" checked={!!selB[k]} onChange={e=>upd(k,e.target.checked)} style={{accentColor:T.accent}}/>{l}</label>)}</Row>
+                  </>}
+                  {panel==="border"&&<>
+                    <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{background:T.cardBg,border:`1px solid ${T.cardBdr}`,borderRadius:10,padding:"12px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}><ShapePreview b={selB} size={64}/><div style={{fontSize:9,color:T.textMuted}}>BORDER PREVIEW</div></div></div>
+                    <ColorPicker label="BORDER COLOR" value={selB.borderColor} onChange={v=>upd("borderColor",v)} presets={BORDER_PRESETS} applyKey="borderColor"/>
+                    <Slider label="BORDER WIDTH" val={selB.borderWidth} min={0} max={10} step={0.1} onChange={v=>upd("borderWidth",v)} unit="px" applyKey="borderWidth"/>
+                    <Label>BORDER STYLE</Label>
+                    <Row gap={4}>{[["solid","━━ Solid"],["dashed","╌╌ Dashed"],["dotted","··· Dotted"],["none","✕ None"]].map(([s,l])=><button key={s} onClick={()=>upd("borderStyle",s)} style={{flex:1,padding:"6px 4px",borderRadius:5,border:"1px solid",borderColor:selB.borderStyle===s?T.accent:T.cardBdr,background:selB.borderStyle===s?T.accentBg:"transparent",color:selB.borderStyle===s?T.accent:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700}}>{l}</button>)}</Row>
+                    <Label>GLOW</Label>
+                    <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:10,color:T.text,marginBottom:8}}><input type="checkbox" checked={!!selB.borderGlow} onChange={e=>upd("borderGlow",e.target.checked)} style={{accentColor:T.accent}}/>Enable Glow</label>
+                    {selB.borderGlow&&<><ColorPicker label="GLOW COLOR" value={selB.borderGlowColor||"#0066ff"} onChange={v=>upd("borderGlowColor",v)} presets={BORDER_PRESETS}/><Slider label="GLOW SIZE" val={selB.borderGlowSize||6} min={0} max={30} step={0.5} onChange={v=>upd("borderGlowSize",v)} unit="px"/></>}
+                    {selB.shadow&&<><ColorPicker label="SHADOW COLOR" value={selB.shadowColor||"rgba(0,0,0,0.5)"} onChange={v=>upd("shadowColor",v)} presets={["rgba(0,0,0,0.5)","rgba(0,0,0,0.8)","rgba(239,68,68,0.5)","rgba(59,130,246,0.5)","rgba(34,197,94,0.5)",...PRESET_COLORS]}/><Slider label="SHADOW BLUR" val={selB.shadowBlur||6} min={0} max={30} step={0.5} onChange={v=>upd("shadowBlur",v)} unit="px"/></>}
+                    <Label>APPLY TO ALL</Label>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>{[["borderColor","Border Color"],["borderWidth","Border Width"],["borderStyle","Border Style"],["borderGlow","Glow"]].map(([k,l])=><button key={k} onClick={()=>applyToAll(k,selB[k])} style={{padding:"5px 4px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700}}>{l}→ALL</button>)}</div>
+                  </>}
+                  {panel==="style"&&<>
+                    <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{background:T.cardBg,border:`1px solid ${T.cardBdr}`,borderRadius:10,padding:"12px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}><ShapePreview b={selB} size={64}/><div style={{fontSize:9,color:T.textMuted}}>FILL PREVIEW</div></div></div>
+                    <ColorPicker label="FILL COLOR" value={selB.bgColor} onChange={v=>upd("bgColor",v)} applyKey="bgColor"/>
+                    <Slider label="FILL OPACITY" val={selB.bgOpacity??1} min={0} max={1} step={0.01} onChange={v=>upd("bgOpacity",v)} applyKey="bgOpacity"/>
+                    <Label>APPLY TO ALL</Label>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>{[["bgColor","Fill Color"],["bgOpacity","Fill Opacity"],["shadow","Shadow"],["opacity","Opacity"]].map(([k,l])=><button key={k} onClick={()=>applyToAll(k,selB[k])} style={{padding:"5px 4px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700}}>{l}→ALL</button>)}</div>
+                  </>}
+                  {panel==="text"&&<>
+                    <ColorPicker label="TEXT COLOR" value={selB.textColor} onChange={v=>upd("textColor",v)} applyKey="textColor"/>
+                    <Slider label="FONT SIZE" val={selB.fontSize} min={6} max={30} step={0.5} onChange={v=>upd("fontSize",v)} unit="px" applyKey="fontSize"/>
+                    <Label>FONT WEIGHT</Label>
+                    <Row gap={4}>{[["normal","Normal"],["600","Semi"],["bold","Bold"],["900","Black"]].map(([w,l])=><button key={w} onClick={()=>upd("fontWeight",w)} style={{flex:1,padding:"6px 3px",borderRadius:5,border:"1px solid",borderColor:selB.fontWeight===w?T.accent:T.cardBdr,background:selB.fontWeight===w?T.accentBg:"transparent",color:selB.fontWeight===w?T.accent:T.textMuted,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:w}}>{l}</button>)}</Row>
+                    <Label>APPLY TO ALL</Label>
+                    <Row gap={4}>{[["textColor","Color"],["fontSize","Size"],["fontWeight","Weight"]].map(([k,l])=><button key={k} onClick={()=>applyToAll(k,selB[k])} style={{flex:1,padding:"5px 3px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit",fontWeight:700}}>{l}→ALL</button>)}</Row>
+                  </>}
+                  {panel==="position"&&<>
+                    <Label mt={8}>X POSITION (%)</Label>
+                    <Row gap={6}><Inp val={selB.x.toFixed(1)} type="number" min={0} max={100} step={0.5} onChange={v=>upd("x",Math.min(Math.max(v,0),100))} w={70}/><input type="range" min={0} max={100} step={0.5} value={selB.x} onChange={e=>upd("x",Number(e.target.value))} style={{flex:1,accentColor:T.accent}}/></Row>
+                    <Label>Y POSITION (%)</Label>
+                    <Row gap={6}><Inp val={selB.y.toFixed(1)} type="number" min={0} max={100} step={0.5} onChange={v=>upd("y",Math.min(Math.max(v,0),100))} w={70}/><input type="range" min={0} max={100} step={0.5} value={selB.y} onChange={e=>upd("y",Number(e.target.value))} style={{flex:1,accentColor:T.accent}}/></Row>
+                    <Label>NUDGE</Label>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,width:120,margin:"0 auto 10px"}}>
+                      <div/><button onClick={()=>upd("y",Math.max(selB.y-0.5,0))} style={{padding:"6px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.accent,cursor:"pointer",fontSize:13}}>▲</button><div/>
+                      <button onClick={()=>upd("x",Math.max(selB.x-0.5,0))} style={{padding:"6px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.accent,cursor:"pointer",fontSize:13}}>◀</button>
+                      <div style={{background:T.cardBg,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:T.textMuted}}>✛</div>
+                      <button onClick={()=>upd("x",Math.min(selB.x+0.5,100))} style={{padding:"6px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.accent,cursor:"pointer",fontSize:13}}>▶</button>
+                      <div/><button onClick={()=>upd("y",Math.min(selB.y+0.5,100))} style={{padding:"6px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.accent,cursor:"pointer",fontSize:13}}>▼</button><div/>
+                    </div>
+                    <Label>SNAP</Label>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4}}>{[["Top","y",5],["Bottom","y",95],["Left","x",5],["Right","x",95],["Ctr H","x",50],["Ctr V","y",50]].map(([l,k,v])=><button key={l} onClick={()=>upd(k,v)} style={{padding:"5px 3px",borderRadius:5,border:`1px solid ${T.cardBdr}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontSize:9,fontFamily:"inherit"}}>{l}</button>)}</div>
+                  </>}
+                </div>
+              </>):(
+                <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:T.textLabel,fontSize:11,textAlign:"center",padding:20,lineHeight:2.2}}>
+                  Select a balloon<br/>to edit properties<br/><span style={{color:T.textMuted}}>or ➕ ADD BALLOON</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Confirm Delete Dialog */}
+          {confirmDel&&(
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{background:T.cardBg,border:"1px solid #dc262666",borderRadius:12,padding:"28px 32px",width:340,boxShadow:"0 20px 60px rgba(0,0,0,0.8)",textAlign:"center"}}>
+                <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+                <div style={{fontWeight:700,fontSize:14,color:"#fff",marginBottom:8}}>Delete Drawing?</div>
+                <div style={{fontSize:12,color:T.textMuted,marginBottom:22,lineHeight:1.7}}>This will remove the uploaded drawing<br/>and all {balloons.length} balloon{balloons.length!==1?"s":""} placed on it.</div>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>setConfirmDel(false)} style={{flex:1,padding:"9px",borderRadius:7,border:`1px solid ${T.inputBdr}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:700}}>CANCEL</button>
+                  <button onClick={()=>{setImage(null);setBalloons([]);setSelected(null);setCounter(1);setZoom(1);setPanPos({x:0,y:0});setConfirmDel(false);showToast("Drawing deleted");}} style={{flex:1,padding:"9px",borderRadius:7,border:"none",background:"linear-gradient(135deg,#b91c1c,#dc2626)",color:"#fff",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:700}}>YES, DELETE</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {toast&&<div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",background:T.toastBg,border:`1px solid ${T.toastBdr}`,borderRadius:8,padding:"8px 18px",fontSize:12,color:T.toastText,boxShadow:"0 4px 20px rgba(0,102,255,.25)",zIndex:999,whiteSpace:"nowrap",animation:"fadein .2s ease"}}>{toast}</div>}
         </div>
-    </main>
-    <footer>
-        <p>Enhancements: Version v2.0.0 includes enhanced saving/loading, undo/redo, batch selection, keyboard shortcuts, grid display, and rotation support.</p>
-    </footer>
+      );
+    }
+
+    function App() {
+      const [unlocked, setUnlocked] = useState(false);
+      if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+      return <BallooningTool />;
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
 </body>
 </html>
