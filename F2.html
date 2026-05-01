@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FURY v1.3 – 3D Engineering Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+      --border: #30363d; --border2: #21262d;
+      --accent: #58a6ff; --accent2: #1f6feb;
+      --text: #e6edf3; --text2: #8b949e; --text3: #484f58;
+      --green: #3fb950; --orange: #f0883e; --red: #f85149;
+      --purple: #bc8cff; --yellow: #e3b341;
+      --sidebar-w: 280px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    #app { display: flex; flex-direction: column; height: 100vh; }
+    #header { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 44px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; z-index: 10; }
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #sidebar { width: var(--sidebar-w); background: var(--bg2); border-right: 1px solid var(--border); overflow-y: auto; overflow-x: hidden; flex-shrink: 0; display: flex; flex-direction: column; }
+    #viewer-wrap { flex: 1; position: relative; background: var(--bg); }
+    #canvas { display: block; width: 100%; height: 100%; }
+    #toolbar { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+
+    /* ── Scrollbar ─────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Header ────────────────────────────────────────────── */
+    .logo { font-weight: 700; font-size: 15px; letter-spacing: 0.12em; color: var(--accent); }
+    .logo span { color: var(--text2); font-weight: 400; font-size: 10px; letter-spacing: 0.2em; margin-left: 8px; }
+    #header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .hbtn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 4px 10px; border-radius: 5px; cursor: pointer; font-family: inherit; font-size: 11px; transition: all .15s; }
+    .hbtn:hover { border-color: var(--accent); color: var(--accent); }
+    .hbtn.active { background: var(--accent2); border-color: var(--accent); color: #fff; }
+
+    /* ── Sidebar sections ──────────────────────────────────── */
+    .section { border-bottom: 1px solid var(--border2); }
+    .section-header { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; user-select: none; background: var(--bg2); font-size: 10px; font-weight: 600; letter-spacing: 0.15em; color: var(--text2); text-transform: uppercase; }
+    .section-header:hover { color: var(--text); }
+    .section-header .arrow { margin-left: auto; transition: transform .2s; }
+    .section-header.open .arrow { transform: rotate(90deg); }
+    .section-body { padding: 10px 12px; display: none; }
+    .section-body.open { display: block; }
+
+    /* ── Controls ──────────────────────────────────────────── */
+    label { display: block; color: var(--text2); font-size: 10px; letter-spacing: 0.08em; margin-bottom: 4px; margin-top: 8px; }
+    label:first-child { margin-top: 0; }
+    input[type=range] { width: 100%; height: 4px; accent-color: var(--accent); cursor: pointer; }
+    input[type=number], input[type=text], select { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 5px; font-family: inherit; font-size: 11px; outline: none; }
+    input[type=number]:focus, select:focus { border-color: var(--accent); }
+    select option { background: var(--bg3); }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+
+    /* ── Buttons ───────────────────────────────────────────── */
+    .btn { display: block; width: 100%; padding: 7px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 5px; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-align: center; transition: all .15s; }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent2); border-color: var(--accent); color: #fff; }
+    .btn.primary:hover { background: var(--accent); }
+    .btn.danger { border-color: var(--red); color: var(--red); }
+    .btn.danger:hover { background: rgba(248,81,73,0.1); }
+    .btn.green { background: rgba(63,185,80,0.1); border-color: var(--green); color: var(--green); }
+    .btn.green:hover { background: rgba(63,185,80,0.2); }
+    .btn.orange { background: rgba(240,136,62,0.1); border-color: var(--orange); color: var(--orange); }
+    .btn.orange:hover { background: rgba(240,136,62,0.2); }
+    .btn-group { display: flex; gap: 4px; margin-top: 6px; }
+    .btn-group .btn { flex: 1; }
+
+    /* ── Toolbar buttons ───────────────────────────────────── */
+    .tbtn { width: 34px; height: 34px; background: rgba(22,27,34,0.92); border: 1px solid var(--border); color: var(--text2); border-radius: 6px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all .15s; backdrop-filter: blur(4px); }
+    .tbtn:hover { border-color: var(--accent); color: var(--accent); }
+    .tbtn.active { background: var(--accent2); border-color: var(--accent); color: #fff; }
+
+    /* ── Metrics ───────────────────────────────────────────── */
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .metric { background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; padding: 8px; }
+    .metric-val { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; }
+    .metric-lbl { font-size: 9px; color: var(--text3); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 2px; }
+    .metric.wide { grid-column: span 2; }
+
+    /* ── Material palette ──────────────────────────────────── */
+    .mat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .mat-btn { aspect-ratio: 1; border-radius: 5px; border: 2px solid transparent; cursor: pointer; transition: all .15s; }
+    .mat-btn.active { border-color: var(--accent); transform: scale(1.05); }
+
+    /* ── Drop zone ─────────────────────────────────────────── */
+    #drop-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(13,17,23,0.85); z-index: 20; pointer-events: none; opacity: 0; transition: opacity .2s; }
+    #drop-overlay.show { opacity: 1; pointer-events: all; }
+    #drop-icon { font-size: 48px; }
+    #drop-text { font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
+    #drop-sub { font-size: 11px; color: var(--text2); letter-spacing: 0.1em; }
+
+    /* ── Upload placeholder ────────────────────────────────── */
+    #upload-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; cursor: pointer; }
+    #upload-placeholder .up-icon { font-size: 56px; opacity: 0.3; }
+    #upload-placeholder .up-text { font-size: 14px; font-weight: 600; color: var(--text2); letter-spacing: 0.1em; }
+    #upload-placeholder .up-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.12em; text-transform: uppercase; }
+    #upload-placeholder .up-btn { background: var(--accent2); border: 1px solid var(--accent); color: #fff; padding: 8px 20px; border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; letter-spacing: 0.06em; }
+    #file-input { display: none; }
+
+    /* ── Status bar ────────────────────────────────────────── */
+    #status { position: absolute; bottom: 10px; left: 10px; font-size: 10px; color: var(--text3); letter-spacing: 0.1em; background: rgba(13,17,23,0.8); padding: 4px 8px; border-radius: 4px; backdrop-filter: blur(4px); }
+
+    /* ── Toast ─────────────────────────────────────────────── */
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg2); border: 1px solid var(--accent); color: var(--accent); padding: 10px 16px; border-radius: 8px; font-size: 11px; letter-spacing: 0.08em; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity .2s; transform: translateY(8px); }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Bend analysis list ────────────────────────────────── */
+    .bend-item { background: var(--bg3); border: 1px solid var(--border2); border-radius: 5px; padding: 7px 9px; margin-bottom: 5px; }
+    .bend-item-header { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .bend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .bend-label { flex: 1; font-weight: 600; font-size: 11px; color: var(--text); }
+    .bend-angle { font-size: 10px; color: var(--accent); }
+    .bend-details { margin-top: 6px; display: none; }
+    .bend-details.open { display: block; }
+    .bend-detail-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--text2); padding: 2px 0; border-bottom: 1px solid var(--border2); }
+    .bend-detail-row:last-child { border: none; }
+    .bend-detail-val { color: var(--text); font-weight: 600; }
+
+    /* ── 2D Modal ──────────────────────────────────────────── */
+    #modal2d { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; display: none; align-items: center; justify-content: center; }
+    #modal2d.show { display: flex; }
+    #modal2d-inner { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; width: 90vw; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+    #modal2d-header { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 10px; }
+    #modal2d-title { font-weight: 700; font-size: 13px; letter-spacing: 0.1em; flex: 1; }
+    #modal2d-canvas-wrap { flex: 1; overflow: auto; background: #fff; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    #canvas2d { border: 1px solid #ccc; }
+    #modal2d-footer { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+
+    /* ── Animation bar ─────────────────────────────────────── */
+    #anim-bar { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(22,27,34,0.95); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; display: none; align-items: center; gap: 10px; z-index: 10; backdrop-filter: blur(4px); min-width: 340px; }
+    #anim-bar.show { display: flex; }
+    #anim-label { font-size: 10px; color: var(--text2); letter-spacing: 0.1em; white-space: nowrap; }
+    #anim-slider { flex: 1; }
+    #anim-pct { font-size: 11px; color: var(--accent); font-weight: 600; min-width: 36px; text-align: right; }
+    .anim-btn { background: none; border: 1px solid var(--border); color: var(--text2); border-radius: 4px; cursor: pointer; font-size: 12px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+    .anim-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Blank mode overlay message ────────────────────────── */
+    #blank-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(31,111,235,0.15); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 14px; font-size: 11px; color: var(--accent); letter-spacing: 0.08em; display: none; z-index: 6; }
+    #blank-hint.show { display: block; }
+
+    /* ── Info badges ───────────────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; gap: 4px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px; padding: 2px 7px; font-size: 10px; color: var(--text2); }
+    .badge.green { border-color: rgba(63,185,80,0.5); color: var(--green); background: rgba(63,185,80,0.07); }
+    .badge.orange { border-color: rgba(240,136,62,0.5); color: var(--orange); background: rgba(240,136,62,0.07); }
+
+    /* ── Slider value display ──────────────────────────────── */
+    .range-row { display: flex; align-items: center; gap: 8px; }
+    .range-row input[type=range] { flex: 1; }
+    .range-val { font-size: 11px; color: var(--accent); min-width: 38px; text-align: right; font-weight: 600; }
+
+    /* ── Progress bar ──────────────────────────────────────── */
+    .progress-wrap { background: var(--bg3); border-radius: 4px; height: 4px; margin: 6px 0; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 4px; transition: width .3s; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- ── Header ──────────────────────────────────────── -->
+  <div id="header">
+    <div class="logo">FURY <span>3D ENGINEERING DASHBOARD v1.3</span></div>
+    <div id="header-right">
+      <button class="hbtn" id="btn-wireframe" title="Toggle Wireframe (W)">⬡ WIREFRAME</button>
+      <button class="hbtn active" id="btn-blank-mode" title="Toggle Blank Mode (B)">▧ BLANK MODE</button>
+      <button class="hbtn" id="btn-export-stl">↓ STL</button>
+      <button class="hbtn" id="btn-export-png">📷 PNG</button>
+      <button class="hbtn" id="btn-file-open">📂 OPEN</button>
+      <input type="file" id="file-input" accept=".stl,.obj,.glb,.gltf"/>
+    </div>
+  </div>
+
+  <!-- ── Main ────────────────────────────────────────── -->
+  <div id="main">
+    <!-- ── Sidebar ──────────────────────────────────── -->
+    <div id="sidebar">
+
+      <!-- File Info -->
+      <div class="section">
+        <div class="section-header open" data-sec="file">
+          <span>📄</span> FILE INFO <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-file">
+          <div class="metric-grid">
+            <div class="metric"><div class="metric-val" id="m-verts">—</div><div class="metric-lbl">Vertices</div></div>
+            <div class="metric"><div class="metric-val" id="m-faces">—</div><div class="metric-lbl">Faces</div></div>
+            <div class="metric wide"><div class="metric-val" id="m-area">—</div><div class="metric-lbl">Surface Area (mm²)</div></div>
+            <div class="metric"><div class="metric-val" id="m-bbx">—</div><div class="metric-lbl">Width mm</div></div>
+            <div class="metric"><div class="metric-val" id="m-bby">—</div><div class="metric-lbl">Height mm</div></div>
+            <div class="metric wide"><div class="metric-val" id="m-bbz">—</div><div class="metric-lbl">Depth mm</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Controls -->
+      <div class="section">
+        <div class="section-header open" data-sec="view">
+          <span>🎥</span> VIEW <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-view">
+          <div class="btn-group">
+            <button class="btn" id="btn-iso">ISO</button>
+            <button class="btn" id="btn-top">TOP</button>
+            <button class="btn" id="btn-front">FRONT</button>
+          </div>
+          <label>Section Clip X</label>
+          <input type="range" id="clip-x" min="-100" max="100" value="100" step="1"/>
+          <label>Section Clip Y</label>
+          <input type="range" id="clip-y" min="-100" max="100" value="100" step="1"/>
+          <label>Section Clip Z</label>
+          <input type="range" id="clip-z" min="-100" max="100" value="100" step="1"/>
+        </div>
+      </div>
+
+      <!-- Material -->
+      <div class="section">
+        <div class="section-header open" data-sec="mat">
+          <span>🎨</span> MATERIAL PRESET <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-mat">
+          <div class="mat-grid" id="mat-grid"></div>
+          <label style="margin-top:10px">Roughness</label>
+          <div class="range-row"><input type="range" id="sl-roughness" min="0" max="1" step="0.01" value="0.3"/><span class="range-val" id="rv-roughness">0.30</span></div>
+          <label>Metalness</label>
+          <div class="range-row"><input type="range" id="sl-metalness" min="0" max="1" step="0.01" value="0.8"/><span class="range-val" id="rv-metalness">0.80</span></div>
+          <label>Opacity</label>
+          <div class="range-row"><input type="range" id="sl-opacity" min="0.05" max="1" step="0.01" value="1"/><span class="range-val" id="rv-opacity">1.00</span></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════ -->
+      <!--  BLANK COMPONENT GENERATOR                       -->
+      <!-- ════════════════════════════════════════════════ -->
+      <div class="section" id="sec-blank-wrap">
+        <div class="section-header open" data-sec="blank" style="color: var(--accent);">
+          <span>▧</span> BLANK GENERATOR <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-blank">
+
+          <!-- Material & Thickness -->
+          <label>Sheet Metal Material</label>
+          <select id="blank-material">
+            <option value="steel">Mild Steel</option>
+            <option value="stainless">Stainless Steel</option>
+            <option value="aluminum" selected>Aluminum</option>
+            <option value="brass">Brass</option>
+            <option value="copper">Copper</option>
+            <option value="titanium">Titanium</option>
+            <option value="plastic">Plastic</option>
+          </select>
+
+          <div class="row2" style="margin-top:8px">
+            <div>
+              <label>Thickness (mm)</label>
+              <input type="number" id="blank-thickness" value="2.0" min="0.5" max="10" step="0.1"/>
+            </div>
+            <div>
+              <label>Bend Radius (mm)</label>
+              <input type="number" id="blank-radius" value="2.0" min="0.5" max="20" step="0.5"/>
+            </div>
+          </div>
+
+          <label>K-Factor</label>
+          <div class="range-row">
+            <input type="range" id="sl-kfactor" min="0.30" max="0.50" step="0.01" value="0.45"/>
+            <span class="range-val" id="rv-kfactor">0.45</span>
+          </div>
+
+          <!-- Material presets info -->
+          <div id="mat-preset-info" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;margin-top:6px;font-size:10px;color:var(--text2);">
+            <span id="mat-preset-label">Aluminum: K=0.45 | Spring-back: 1–2°</span>
+          </div>
+
+          <!-- Actions -->
+          <div class="btn-group" style="margin-top:10px">
+            <button class="btn primary" id="btn-detect-bends">🔍 DETECT BENDS</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn green" id="btn-generate-blank">▧ GENERATE BLANK</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn" id="btn-show-2d">📐 2D LAYOUT VIEW</button>
+            <button class="btn" id="btn-animate">▶ ANIMATE</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn danger" id="btn-reset-blank">✕ RESET</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bend Analysis -->
+      <div class="section" id="sec-bends-wrap" style="display:none">
+        <div class="section-header open" data-sec="bends">
+          <span>📐</span> BEND ANALYSIS <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-bends">
+          <div id="bend-list"></div>
+        </div>
+      </div>
+
+      <!-- Blank Metrics -->
+      <div class="section" id="sec-blank-metrics-wrap" style="display:none">
+        <div class="section-header open" data-sec="bmetrics">
+          <span>📊</span> BLANK METRICS <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-blank-metrics">
+          <div class="metric-grid">
+            <div class="metric"><div class="metric-val" id="bm-w">—</div><div class="metric-lbl">Blank Width mm</div></div>
+            <div class="metric"><div class="metric-val" id="bm-h">—</div><div class="metric-lbl">Blank Length mm</div></div>
+            <div class="metric wide"><div class="metric-val" id="bm-devlen">—</div><div class="metric-lbl">Total Developed Length mm</div></div>
+            <div class="metric"><div class="metric-val" id="bm-bends">—</div><div class="metric-lbl">Bend Count</div></div>
+            <div class="metric"><div class="metric-val" id="bm-spring">—</div><div class="metric-lbl">Spring-back Est.</div></div>
+            <div class="metric wide"><div class="metric-val" id="bm-area">—</div><div class="metric-lbl">Flat Area mm²</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export -->
+      <div class="section" id="sec-export-blank-wrap" style="display:none">
+        <div class="section-header open" data-sec="exportb">
+          <span>📦</span> EXPORT BLANK <span class="arrow">▶</span>
+        </div>
+        <div class="section-body open" id="sec-export-blank">
+          <div class="btn-group">
+            <button class="btn" id="btn-export-dxf">↓ DXF</button>
+            <button class="btn" id="btn-export-json">↓ JSON</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn" id="btn-export-pdf">↓ PDF REPORT</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn" id="btn-export-flat-png">📷 FLAT PNG</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar -->
+
+    <!-- ── 3D Viewer ─────────────────────────────────── -->
+    <div id="viewer-wrap">
+      <canvas id="canvas"></canvas>
+
+      <!-- Drop overlay -->
+      <div id="drop-overlay">
+        <div id="drop-icon">📂</div>
+        <div id="drop-text">DROP FILE HERE</div>
+        <div id="drop-sub">STL · OBJ · GLB · GLTF</div>
+      </div>
+
+      <!-- Upload placeholder -->
+      <div id="upload-placeholder">
+        <div class="up-icon">⬡</div>
+        <div class="up-text">FURY 3D ENGINEERING DASHBOARD</div>
+        <div class="up-sub">Drag & drop a 3D file or click to browse</div>
+        <button class="up-btn" onclick="document.getElementById('file-input').click()">📂 OPEN FILE</button>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:0.12em">STL · OBJ · GLB/GLTF</div>
+      </div>
+
+      <!-- Toolbar -->
+      <div id="toolbar">
+        <button class="tbtn" id="tb-wireframe" title="Wireframe (W)">⬡</button>
+        <button class="tbtn" id="tb-blank" title="Blank Mode (B)" style="font-size:12px">▧</button>
+        <button class="tbtn" id="tb-iso" title="Isometric">⊹</button>
+        <button class="tbtn" id="tb-reset-cam" title="Reset Camera">⌖</button>
+        <button class="tbtn" id="tb-snap" title="Screenshot">📷</button>
+      </div>
+
+      <!-- Blank hint -->
+      <div id="blank-hint">▧ BLANK GENERATOR ACTIVE – Load a model and click DETECT BENDS</div>
+
+      <!-- Animation bar -->
+      <div id="anim-bar">
+        <span id="anim-label">UNFOLD</span>
+        <button class="anim-btn" id="anim-rev" title="Reverse">◀◀</button>
+        <button class="anim-btn" id="anim-play" title="Play/Pause">▶</button>
+        <button class="anim-btn" id="anim-fwd" title="Forward">▶▶</button>
+        <input type="range" id="anim-slider" min="0" max="100" value="0" step="1"/>
+        <span id="anim-pct">0%</span>
+        <button class="anim-btn" id="anim-close" title="Close">✕</button>
+      </div>
+
+      <!-- Status bar -->
+      <div id="status">FURY v1.3 · Use mouse to orbit · Scroll to zoom · Right-drag to pan</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 2D Layout Modal ───────────────────────────────── -->
+<div id="modal2d">
+  <div id="modal2d-inner">
+    <div id="modal2d-header">
+      <span style="font-size:18px">📐</span>
+      <div id="modal2d-title">2D FLAT PATTERN – DXF LAYOUT VIEW</div>
+      <div id="modal2d-badges" style="display:flex;gap:6px;"></div>
+      <button class="btn" style="width:auto;padding:4px 12px;margin-left:auto" id="btn-modal-close">✕ CLOSE</button>
+    </div>
+    <div id="modal2d-canvas-wrap">
+      <canvas id="canvas2d" width="800" height="600"></canvas>
+    </div>
+    <div id="modal2d-footer">
+      <button class="btn" id="btn-modal-dxf">↓ EXPORT DXF</button>
+      <button class="btn" id="btn-modal-png">📷 EXPORT PNG</button>
+      <div style="margin-left:auto;font-size:10px;color:var(--text3);align-self:center;letter-spacing:0.08em">UNITS: mm · SCALE: 1:1</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  FURY 3D Engineering Dashboard – Blank Component Generator
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Material presets ────────────────────────────────────────────────
+const MATERIAL_PRESETS = {
+  steel:      { name:"Mild Steel",      color:0x8899aa, density:7.85, kFactor:0.44, springBack:"2–3°", minRadius:1.0, maxRadius:2.0, roughness:0.35, metalness:0.9 },
+  stainless:  { name:"Stainless Steel", color:0x99aabb, density:8.00, kFactor:0.42, springBack:"2–4°", minRadius:1.0, maxRadius:2.0, roughness:0.25, metalness:0.95 },
+  aluminum:   { name:"Aluminum",        color:0xaabbcc, density:2.70, kFactor:0.45, springBack:"1–2°", minRadius:0.5, maxRadius:1.0, roughness:0.3,  metalness:0.8 },
+  brass:      { name:"Brass",           color:0xc8a04a, density:8.50, kFactor:0.43, springBack:"1–2°", minRadius:0.5, maxRadius:1.0, roughness:0.25, metalness:0.85 },
+  copper:     { name:"Copper",          color:0xb87333, density:8.96, kFactor:0.41, springBack:"2–3°", minRadius:1.0, maxRadius:2.0, roughness:0.3,  metalness:0.9 },
+  titanium:   { name:"Titanium",        color:0x778899, density:4.50, kFactor:0.40, springBack:"2–4°", minRadius:1.0, maxRadius:3.0, roughness:0.4,  metalness:0.75 },
+  plastic:    { name:"Plastic",         color:0x4488cc, density:1.20, kFactor:0.50, springBack:"0–1°", minRadius:0.5, maxRadius:1.0, roughness:0.8,  metalness:0.0 },
+};
+
+const VIEW_MAT_COLORS = [
+  { label:"Steel",    color:0x8899aa }, { label:"Aluminum", color:0xaabbcc },
+  { label:"Brass",    color:0xc8a04a }, { label:"Copper",   color:0xb87333 },
+  { label:"Gold",     color:0xffd700 }, { label:"Titanium", color:0x778899 },
+  { label:"Plastic",  color:0x3a7bd5 }, { label:"Carbon",   color:0x222222 },
+];
+
+// ── Three.js scene setup ────────────────────────────────────────────
+const canvas     = document.getElementById('canvas');
+const renderer   = new THREE.WebGLRenderer({ canvas, antialias:true, preserveDrawingBuffer:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.localClippingEnabled = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1117);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 2000);
+camera.position.set(80, 60, 120);
+
+// Lighting
+const hemi = new THREE.HemisphereLight(0xffffff, 0x222244, 0.6);
+scene.add(hemi);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(80, 120, 60);
+dirLight.castShadow = true;
+scene.add(dirLight);
+const dirLight2 = new THREE.DirectionalLight(0x8899ff, 0.5);
+dirLight2.position.set(-60, -40, -80);
+scene.add(dirLight2);
+const ambLight = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(ambLight);
+
+// Grid
+const gridHelper = new THREE.GridHelper(200, 40, 0x1e3a5f, 0x152032);
+scene.add(gridHelper);
+
+// Clipping planes
+const clipPlanes = [
+  new THREE.Plane(new THREE.Vector3(1, 0, 0), 100),
+  new THREE.Plane(new THREE.Vector3(0, 1, 0), 100),
+  new THREE.Plane(new THREE.Vector3(0, 0, 1), 100),
+];
+
+// ── OrbitControls (inline) ──────────────────────────────────────────
+class OrbitControls {
+  constructor(cam, domEl) {
+    this.cam = cam; this.dom = domEl;
+    this.target = new THREE.Vector3();
+    this._sph = new THREE.Spherical(); this._sph.setFromVector3(cam.position);
+    this._dragging = false; this._rDragging = false;
+    this._last = {x:0,y:0}; this._rLast = {x:0,y:0};
+    domEl.addEventListener('mousedown', e => {
+      if(e.button===0){ this._dragging=true; this._last={x:e.clientX,y:e.clientY}; }
+      if(e.button===2){ this._rDragging=true; this._rLast={x:e.clientX,y:e.clientY}; }
+    });
+    window.addEventListener('mousemove', e => {
+      if(this._dragging){
+        const dx=(e.clientX-this._last.x)*0.01, dy=(e.clientY-this._last.y)*0.01;
+        this._sph.theta -= dx; this._sph.phi -= dy;
+        this._sph.phi = Math.max(0.05, Math.min(Math.PI-0.05, this._sph.phi));
+        this._last={x:e.clientX,y:e.clientY}; this._update();
+      }
+      if(this._rDragging){
+        const dx=(e.clientX-this._rLast.x)*0.05, dy=(e.clientY-this._rLast.y)*0.05;
+        const right = new THREE.Vector3(); right.crossVectors(cam.getWorldDirection(new THREE.Vector3()), cam.up).normalize();
+        this.target.addScaledVector(right, -dx);
+        this.target.addScaledVector(cam.up, dy);
+        this._rLast={x:e.clientX,y:e.clientY}; this._update();
+      }
+    });
+    window.addEventListener('mouseup', () => { this._dragging=false; this._rDragging=false; });
+    domEl.addEventListener('wheel', e => {
+      e.preventDefault();
+      this._sph.radius *= (1 + e.deltaY * 0.001);
+      this._sph.radius = Math.max(0.5, Math.min(1000, this._sph.radius));
+      this._update();
+    }, {passive:false});
+    domEl.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  _update() {
+    const v = new THREE.Vector3().setFromSpherical(this._sph);
+    this.cam.position.copy(this.target).add(v);
+    this.cam.lookAt(this.target);
+  }
+  setView(p) {
+    const d = this._sph.radius;
+    this.cam.position.copy(p.clone().normalize().multiplyScalar(d)).add(this.target);
+    this.cam.lookAt(this.target);
+    this._sph.setFromVector3(this.cam.position.clone().sub(this.target));
+  }
+}
+const controls = new OrbitControls(camera, canvas);
+
+// ── App state ────────────────────────────────────────────────────────
+let modelMesh    = null;
+let modelScaleFactor = 1; // tracks scale applied during import for unit conversion
+let blankMode    = true;
+let wireframe    = false;
+let blankData    = null;
+let flatMesh     = null;
+let bendHelpers  = [];
+let animActive   = false;
+let animPlaying  = false;
+let animT        = 0;      // 0 = formed, 1 = flat
+let animDir      = 1;
+let animRAF      = null;
+let currentMat   = MATERIAL_PRESETS.aluminum;
+let matKey       = 'aluminum';
+
+const meshMaterial = new THREE.MeshStandardMaterial({
+  color: 0xaabbcc, roughness: 0.3, metalness: 0.8,
+  clippingPlanes: clipPlanes, clipShadows: true, side: THREE.DoubleSide,
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function toast(msg, dur=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+function $(id) { return document.getElementById(id); }
+function showEl(id)  { const e=$(id); if(e) e.style.display=''; }
+function hideEl(id)  { const e=$(id); if(e) e.style.display='none'; }
+function blockEl(id) { const e=$(id); if(e) e.style.display='block'; }
+
+// ── Resize ───────────────────────────────────────────────────────────
+function resize() {
+  const wrap = document.getElementById('viewer-wrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Render loop ──────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  if(animPlaying) tickAnimation();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── Upload placeholder logic ──────────────────────────────────────────
+$('upload-placeholder').addEventListener('click', () => $('file-input').click());
+
+// ── Drag & Drop ──────────────────────────────────────────────────────
+const viewerWrap = document.getElementById('viewer-wrap');
+viewerWrap.addEventListener('dragover', e => { e.preventDefault(); $('drop-overlay').classList.add('show'); });
+viewerWrap.addEventListener('dragleave', () => $('drop-overlay').classList.remove('show'));
+viewerWrap.addEventListener('drop', e => {
+  e.preventDefault(); $('drop-overlay').classList.remove('show');
+  const f = e.dataTransfer.files[0];
+  if(f) loadFile(f);
+});
+$('file-input').addEventListener('change', e => { const f = e.target.files[0]; if(f) loadFile(f); });
+$('btn-file-open').addEventListener('click', () => $('file-input').click());
+
+// ── File loading ──────────────────────────────────────────────────────
+function loadFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const buf = e.target.result;
+      if(ext === 'stl') loadSTL(buf);
+      else if(ext === 'obj') loadOBJ(e.target.result);
+      else if(ext === 'glb' || ext === 'gltf') loadGLB(buf);
+      else toast('⚠ Supported: STL, OBJ, GLB, GLTF');
+    } catch(err) { toast('⚠ Error loading file: ' + err.message); }
+  };
+  if(ext === 'obj') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function addModelToScene(geometry, fileName) {
+  if(modelMesh) { scene.remove(modelMesh); modelMesh.geometry.dispose(); }
+  clearBendHelpers();
+  clearFlatMesh();
+  blankData = null;
+  hideEl('sec-bends-wrap');
+  hideEl('sec-blank-metrics-wrap');
+  hideEl('sec-export-blank-wrap');
+  $('anim-bar').classList.remove('show');
+  animPlaying = false;
+
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  const center = new THREE.Vector3();
+  bb.getCenter(center);
+  geometry.translate(-center.x, -center.y, -center.z);
+
+  const size = new THREE.Vector3();
+  bb.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 60 / maxDim;
+  modelScaleFactor = scale;
+  geometry.scale(scale, scale, scale);
+  geometry.computeBoundingBox();
+  geometry.computeVertexNormals();
+
+  modelMesh = new THREE.Mesh(geometry, meshMaterial.clone());
+  modelMesh.castShadow = true;
+  scene.add(modelMesh);
+
+  // Reset camera
+  const scaledSize = size.clone().multiplyScalar(scale);
+  const dist = Math.max(scaledSize.x, scaledSize.y, scaledSize.z) * 2.2;
+  controls._sph.radius = dist;
+  controls.target.set(0, 0, 0);
+  controls._update();
+  camera.near = dist * 0.001;
+  camera.far  = dist * 20;
+  camera.updateProjectionMatrix();
+
+  hideEl('upload-placeholder');
+  updateMetrics(geometry, scaledSize);
+
+  if(blankMode) $('blank-hint').classList.add('show');
+  toast(`✅ Loaded: ${fileName}`);
+}
+
+// ── STL Parser ───────────────────────────────────────────────────────
+function loadSTL(buffer) {
+  const geom = parseSTL(buffer);
+  addModelToScene(geom, 'model.stl');
+}
+
+function parseSTL(buffer) {
+  const view = new DataView(buffer);
+  // Robust ASCII STL detection: check for 'solid' keyword AND verify that the
+  // buffer byteLength does not match the expected binary format (numTri*50+84).
+  // A binary STL can accidentally begin with "solid", so we require both checks.
+  const startBytes = new Uint8Array(buffer, 0, 256);
+  const startText = new TextDecoder('utf-8', { fatal: false }).decode(startBytes);
+  const expectedBinarySize = view.getUint32(80, true) * 50 + 84;
+  const isASCII = startText.trimStart().startsWith('solid') &&
+    (expectedBinarySize !== buffer.byteLength);
+  const geo = new THREE.BufferGeometry();
+  const positions = [];
+  const normals = [];
+
+  if(isASCII) {
+    const text = new TextDecoder().decode(buffer);
+    const vRe = /vertex\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g;
+    const nRe = /facet normal\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g;
+    let vm, nm;
+    const norms = [];
+    while((nm = nRe.exec(text)) !== null) norms.push([+nm[1],+nm[2],+nm[3]]);
+    let fi = 0;
+    while((vm = vRe.exec(text)) !== null) {
+      positions.push(+vm[1],+vm[2],+vm[3]);
+      const n = norms[Math.floor(fi/3)] || [0,1,0];
+      normals.push(n[0],n[1],n[2]);
+      fi++;
+    }
+  } else {
+    const numTri = view.getUint32(80, true);
+    let off = 84;
+    for(let i = 0; i < numTri; i++) {
+      const nx=view.getFloat32(off,true),ny=view.getFloat32(off+4,true),nz=view.getFloat32(off+8,true);
+      off+=12;
+      for(let j=0;j<3;j++){
+        positions.push(view.getFloat32(off,true),view.getFloat32(off+4,true),view.getFloat32(off+8,true));
+        normals.push(nx,ny,nz);
+        off+=12;
+      }
+      off+=2;
+    }
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geo;
+}
+
+// ── OBJ Parser ───────────────────────────────────────────────────────
+function loadOBJ(text) {
+  const verts=[], uvs=[], norms=[], positions=[], normOut=[];
+  const lines = text.split('\n');
+  for(const line of lines) {
+    const p = line.trim().split(/\s+/);
+    if(p[0]==='v')  verts.push([+p[1],+p[2],+p[3]]);
+    else if(p[0]==='vn') norms.push([+p[1],+p[2],+p[3]]);
+    else if(p[0]==='f') {
+      const pts = p.slice(1).map(s => { const x=s.split('/'); return {v:+x[0]-1,n:x[2]?+x[2]-1:-1}; });
+      for(let i=1;i<pts.length-1;i++){
+        [pts[0],pts[i],pts[i+1]].forEach(pt => {
+          positions.push(...verts[pt.v]);
+          normOut.push(...(pt.n>=0?norms[pt.n]:[0,1,0]));
+        });
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normOut, 3));
+  addModelToScene(geo, 'model.obj');
+}
+
+// ── GLB/GLTF (basic mesh extraction) ─────────────────────────────────
+function loadGLB(buffer) {
+  try {
+    // Extract first mesh from GLB binary
+    const view = new DataView(buffer);
+    const magic = view.getUint32(0, true);
+    if(magic !== 0x46546C67) { toast('⚠ Invalid GLB file'); return; }
+    const jsonLen = view.getUint32(12, true);
+    const jsonBytes = new Uint8Array(buffer, 20, jsonLen);
+    const json = JSON.parse(new TextDecoder().decode(jsonBytes));
+    const binStart = 20 + jsonLen + 8;
+    const binData = buffer.slice(binStart);
+
+    // Find first mesh primitive
+    const mesh0 = json.meshes && json.meshes[0];
+    if(!mesh0) { toast('⚠ No mesh in GLB'); return; }
+    const prim = mesh0.primitives[0];
+    const posAcc = json.accessors[prim.attributes.POSITION];
+    const bvPos  = json.bufferViews[posAcc.bufferView];
+    const posArr = new Float32Array(binData, bvPos.byteOffset||0, posAcc.count*3);
+    const positions = Array.from(posArr);
+
+    let normals = [];
+    if(prim.attributes.NORMAL !== undefined){
+      const nAcc = json.accessors[prim.attributes.NORMAL];
+      const bvN  = json.bufferViews[nAcc.bufferView];
+      normals = Array.from(new Float32Array(binData, bvN.byteOffset||0, nAcc.count*3));
+    }
+
+    const geo = new THREE.BufferGeometry();
+    if(prim.indices !== undefined) {
+      const iAcc = json.accessors[prim.indices];
+      const bvI  = json.bufferViews[iAcc.bufferView];
+      let indices;
+      if(iAcc.componentType===5123) indices = new Uint16Array(binData, bvI.byteOffset||0, iAcc.count);
+      else if(iAcc.componentType===5125) indices = new Uint32Array(binData, bvI.byteOffset||0, iAcc.count);
+      geo.setIndex(Array.from(indices));
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if(normals.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    addModelToScene(geo, 'model.glb');
+  } catch(err) {
+    toast('⚠ GLB parse error: ' + err.message);
+  }
+}
+
+// ── Metrics ──────────────────────────────────────────────────────────
+function updateMetrics(geo, size) {
+  const pos = geo.attributes.position;
+  const vCount = pos.count;
+  const fCount = geo.index ? geo.index.count/3 : vCount/3;
+
+  // Surface area: computed in scene units², converted to mm² via scale factor.
+  // modelScaleFactor = 60/maxDim, so 1 scene unit = (1/modelScaleFactor) mm,
+  // and 1 scene unit² = 1/(modelScaleFactor²) mm².
+  let area = 0;
+  const vA=new THREE.Vector3(), vB=new THREE.Vector3(), vC=new THREE.Vector3(), cross=new THREE.Vector3();
+  for(let i=0; i<vCount; i+=3) {
+    vA.fromBufferAttribute(pos,i); vB.fromBufferAttribute(pos,i+1); vC.fromBufferAttribute(pos,i+2);
+    cross.crossVectors(vB.clone().sub(vA), vC.clone().sub(vA));
+    area += cross.length() * 0.5;
+  }
+  const sceneToMmSq = 1 / (modelScaleFactor ** 2);
+  const areaMm2 = area * sceneToMmSq;
+  $('m-verts').textContent = vCount.toLocaleString();
+  $('m-faces').textContent = Math.round(fCount).toLocaleString();
+  $('m-area').textContent  = areaMm2.toFixed(1);
+  $('m-bbx').textContent   = size.x.toFixed(1);
+  $('m-bby').textContent   = size.y.toFixed(1);
+  $('m-bbz').textContent   = size.z.toFixed(1);
+}
+
+// ── Section clipping ──────────────────────────────────────────────────
+['clip-x','clip-y','clip-z'].forEach((id,i)=>{
+  $(id).addEventListener('input',()=>{
+    const v = +$(id).value;
+    const bb = modelMesh ? modelMesh.geometry.boundingBox : null;
+    const range = bb ? [bb.min.x,bb.min.y,bb.min.z,bb.max.x,bb.max.y,bb.max.z] : [-100,-100,-100,100,100,100];
+    const span = (range[i+3]-range[i]);
+    clipPlanes[i].constant = range[i] + span * ((v+100)/200);
+  });
+});
+
+// ── Material grid ─────────────────────────────────────────────────────
+const matGrid = $('mat-grid');
+VIEW_MAT_COLORS.forEach(({label,color}) => {
+  const b = document.createElement('button');
+  b.className = 'mat-btn';
+  b.title = label;
+  const c = '#'+color.toString(16).padStart(6,'0');
+  b.style.background = `linear-gradient(135deg, ${c}cc, ${c}88)`;
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.mat-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    if(modelMesh) modelMesh.material.color.setHex(color);
+  });
+  matGrid.appendChild(b);
+});
+
+// Roughness / Metalness / Opacity sliders
+['roughness','metalness','opacity'].forEach(prop=>{
+  $('sl-'+prop).addEventListener('input',()=>{
+    const v = +$('sl-'+prop).value;
+    $('rv-'+prop).textContent = v.toFixed(2);
+    if(modelMesh) modelMesh.material[prop] = v;
+  });
+});
+
+// ── Wireframe ────────────────────────────────────────────────────────
+function toggleWireframe(){
+  wireframe = !wireframe;
+  if(modelMesh) modelMesh.material.wireframe = wireframe;
+  $('tb-wireframe').classList.toggle('active', wireframe);
+  $('btn-wireframe').classList.toggle('active', wireframe);
+}
+$('btn-wireframe').addEventListener('click', toggleWireframe);
+$('tb-wireframe').addEventListener('click', toggleWireframe);
+
+// ── View presets ──────────────────────────────────────────────────────
+function setViewISO()   { controls.setView(new THREE.Vector3(1,0.8,1)); }
+function setViewTop()   { controls.setView(new THREE.Vector3(0,1,0.001)); }
+function setViewFront() { controls.setView(new THREE.Vector3(0,0,1)); }
+$('btn-iso').addEventListener('click', setViewISO);
+$('btn-top').addEventListener('click', setViewTop);
+$('btn-front').addEventListener('click', setViewFront);
+$('tb-iso').addEventListener('click', setViewISO);
+$('tb-reset-cam').addEventListener('click', () => { controls.target.set(0,0,0); setViewISO(); });
+
+// ── Export STL ───────────────────────────────────────────────────────
+$('btn-export-stl').addEventListener('click', () => {
+  if(!modelMesh) { toast('⚠ No model loaded'); return; }
+  const geo = modelMesh.geometry;
+  const pos = geo.attributes.position;
+  const n   = geo.attributes.normal;
+  const triCount = pos.count / 3;
+  const buf = new ArrayBuffer(84 + triCount * 50);
+  const dv  = new DataView(buf);
+  dv.setUint32(80, triCount, true);
+  for(let i=0,o=84; i<triCount; i++,o+=50){
+    dv.setFloat32(o,    n.getX(i*3),   true);
+    dv.setFloat32(o+4,  n.getY(i*3),   true);
+    dv.setFloat32(o+8,  n.getZ(i*3),   true);
+    for(let j=0;j<3;j++){
+      dv.setFloat32(o+12+j*12, pos.getX(i*3+j), true);
+      dv.setFloat32(o+16+j*12, pos.getY(i*3+j), true);
+      dv.setFloat32(o+20+j*12, pos.getZ(i*3+j), true);
+    }
+  }
+  const blob = new Blob([buf],{type:'application/octet-stream'});
+  const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'model.stl'});
+  a.click();
+  toast('✅ STL exported');
+});
+
+// ── Screenshot ───────────────────────────────────────────────────────
+function captureScreenshot(fname='fury-screenshot.png') {
+  renderer.render(scene, camera);
+  canvas.toBlob(blob=>{
+    const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:fname});
+    a.click();
+  });
+}
+$('btn-export-png').addEventListener('click', () => captureScreenshot());
+$('tb-snap').addEventListener('click', () => captureScreenshot());
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  if(e.key==='w'||e.key==='W') toggleWireframe();
+  if(e.key==='b'||e.key==='B') toggleBlankMode();
+  if(e.key==='1') setViewISO();
+  if(e.key==='2') setViewTop();
+  if(e.key==='3') setViewFront();
+});
+
+// ── Section headers toggle ────────────────────────────────────────────
+document.querySelectorAll('.section-header').forEach(h=>{
+  h.addEventListener('click',()=>{
+    h.classList.toggle('open');
+    const body = document.getElementById('sec-'+h.dataset.sec);
+    if(body) body.classList.toggle('open');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  ▧  BLANK COMPONENT GENERATOR
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Blank mode toggle ────────────────────────────────────────────────
+function toggleBlankMode() {
+  blankMode = !blankMode;
+  $('btn-blank-mode').classList.toggle('active', blankMode);
+  $('tb-blank').classList.toggle('active', blankMode);
+  const hint = $('blank-hint');
+  if(blankMode && modelMesh) hint.classList.add('show');
+  else hint.classList.remove('show');
+  toast(blankMode ? '▧ Blank Generator Mode ON' : '▧ Blank Generator Mode OFF');
+}
+$('btn-blank-mode').addEventListener('click', toggleBlankMode);
+$('tb-blank').addEventListener('click', toggleBlankMode);
+
+// ── Material selector sync ────────────────────────────────────────────
+$('blank-material').addEventListener('change', () => {
+  const key = $('blank-material').value;
+  matKey = key;
+  currentMat = MATERIAL_PRESETS[key];
+  $('sl-kfactor').value = currentMat.kFactor;
+  $('rv-kfactor').textContent = currentMat.kFactor.toFixed(2);
+  $('blank-radius').value = ((currentMat.minRadius + currentMat.maxRadius)/2).toFixed(1);
+  $('mat-preset-info').firstElementChild.textContent =
+    `${currentMat.name}: K=${currentMat.kFactor} | Spring-back: ${currentMat.springBack}`;
+  if(modelMesh) {
+    modelMesh.material.color.setHex(currentMat.color);
+    modelMesh.material.roughness = currentMat.roughness;
+    modelMesh.material.metalness = currentMat.metalness;
+  }
+});
+
+$('sl-kfactor').addEventListener('input',()=>{
+  $('rv-kfactor').textContent = (+$('sl-kfactor').value).toFixed(2);
+});
+
+// ── Bend detection ────────────────────────────────────────────────────
+/*
+  Algorithm: Detect fold lines from 3D geometry.
+  For each pair of adjacent faces (sharing an edge), compute the angle between
+  face normals. If the dihedral angle differs significantly from 180° (flat),
+  the edge is a candidate bend line.
+
+  For imported meshes without explicit topology, we use:
+  1. Build edge map from triangle vertices
+  2. For each shared edge, compute dihedral angle
+  3. Cluster nearby bend lines
+  4. Output BendLine objects with position, angle, axis
+*/
+function detectBends(geometry) {
+  const pos  = geometry.attributes.position;
+  const norm = geometry.attributes.normal;
+  const triCount = pos.count / 3;
+
+  // Build face normals and centers
+  const faces = [];
+  for(let i=0;i<triCount;i++){
+    const vA=new THREE.Vector3().fromBufferAttribute(pos,i*3);
+    const vB=new THREE.Vector3().fromBufferAttribute(pos,i*3+1);
+    const vC=new THREE.Vector3().fromBufferAttribute(pos,i*3+2);
+    const center = vA.clone().add(vB).add(vC).divideScalar(3);
+    const nA=new THREE.Vector3().fromBufferAttribute(norm,i*3);
+    faces.push({ vA,vB,vC,center,normal:nA });
+  }
+
+  // Build edge → faces map
+  // Use integer-rounded keys (×1000 = 0.001 precision) for fast hashing
+  const edgeMap = new Map();
+  const vertexKey = (v) => `${Math.round(v.x*1000)},${Math.round(v.y*1000)},${Math.round(v.z*1000)}`;
+  const eKey = (a,b) => { const ka=vertexKey(a),kb=vertexKey(b); return ka<kb?`${ka}|${kb}`:`${kb}|${ka}`; };
+  faces.forEach((f,fi)=>{
+    const edges = [[f.vA,f.vB],[f.vB,f.vC],[f.vC,f.vA]];
+    edges.forEach(([v0,v1])=>{
+      const k = eKey(v0,v1);
+      if(!edgeMap.has(k)) edgeMap.set(k,{v0,v1,faces:[]});
+      edgeMap.get(k).faces.push(fi);
+    });
+  });
+
+  // Find bend edges: edges where the dihedral deviation from flat (180°) exceeds threshold
+  const BEND_DEVIATION_THRESHOLD = 10 * Math.PI/180; // 10° minimum deviation from flat
+  const bendEdges = [];
+  edgeMap.forEach(({v0,v1,faces:fis})=>{
+    if(fis.length !== 2) return;
+    const n0 = faces[fis[0]].normal;
+    const n1 = faces[fis[1]].normal;
+    const dot = Math.max(-1, Math.min(1, n0.dot(n1)));
+    const angle = Math.acos(dot); // angle between normals
+    const dihedral = Math.PI - angle; // deviation from flat (180°)
+    if(Math.abs(dihedral) > BEND_DEVIATION_THRESHOLD) {
+      const midpoint = v0.clone().add(v1).multiplyScalar(0.5);
+      const axis = v1.clone().sub(v0).normalize();
+      bendEdges.push({ v0:v0.clone(), v1:v1.clone(), midpoint, axis, dihedral: dihedral * 180/Math.PI,
+        faceIndices: fis, normal0: n0.clone(), normal1: n1.clone() });
+    }
+  });
+
+  // Cluster nearby bend edges into bend lines
+  const BEND_CLUSTER_DISTANCE = 5; // maximum distance (scene units) for merging bend edges
+  const clusters = [];
+  bendEdges.forEach(e=>{
+    let found = false;
+    for(const c of clusters) {
+      if(c.midpoint.distanceTo(e.midpoint) < BEND_CLUSTER_DISTANCE &&
+         Math.abs(c.axis.dot(e.axis)) > 0.85) {
+        c.edges.push(e);
+        // Incremental/online mean: update running average without recomputing full sum
+        const n = c.edges.length;
+        c.midpoint.multiplyScalar((n-1)/n).addScaledVector(e.midpoint, 1/n);
+        c.totalAngle = (c.totalAngle * (n-1) + Math.abs(e.dihedral)) / n;
+        found = true; break;
+      }
+    }
+    if(!found) clusters.push({ midpoint:e.midpoint.clone(), axis:e.axis.clone(),
+      totalAngle:Math.abs(e.dihedral), edges:[e] });
+  });
+
+  // Sort by angle (largest bends first)
+  clusters.sort((a,b) => b.totalAngle - a.totalAngle);
+
+  return clusters.slice(0, 12); // max 12 bends
+}
+
+// ── Bend allowance calculation ─────────────────────────────────────────
+/*
+  BA = (π/180 × A) × (R + K × T)
+  where:
+    A = bend angle in degrees
+    R = inside bend radius (mm)
+    K = K-factor (neutral axis ratio)
+    T = material thickness (mm)
+*/
+function calcBendAllowance(angleDeg, radiusMm, kFactor, thicknessMm) {
+  const rad = angleDeg * Math.PI / 180;
+  return rad * (radiusMm + kFactor * thicknessMm);
+}
+
+function calcBendDeduction(angleDeg, radiusMm, kFactor, thicknessMm) {
+  const ba = calcBendAllowance(angleDeg, radiusMm, kFactor, thicknessMm);
+  const setback = (radiusMm + thicknessMm) * Math.tan((angleDeg/2) * Math.PI/180);
+  return 2*setback - ba;
+}
+
+// ── Detect bends UI ────────────────────────────────────────────────────
+$('btn-detect-bends').addEventListener('click', () => {
+  if(!modelMesh) { toast('⚠ Load a 3D model first'); return; }
+  $('blank-hint').classList.remove('show');
+
+  const thickness = +$('blank-thickness').value;
+  const radius    = +$('blank-radius').value;
+  const kFactor   = +$('sl-kfactor').value;
+  const mat       = currentMat;
+
+  toast('🔍 Analyzing geometry…', 1500);
+  clearBendHelpers();
+
+  setTimeout(()=>{
+    const rawBends = detectBends(modelMesh.geometry);
+
+    if(rawBends.length === 0) {
+      toast('⚠ No bends detected. Try a sheet-metal component.');
+      return;
+    }
+
+    // Augment with manufacturing data
+    const bends = rawBends.map((c,i)=>{
+      const angle = Math.min(180, Math.max(1, c.totalAngle));
+      const ba = calcBendAllowance(angle, radius, kFactor, thickness);
+      const bd = calcBendDeduction(angle, radius, kFactor, thickness);
+      return {
+        id: i+1,
+        angle: +angle.toFixed(1),
+        radius,
+        kFactor,
+        bendAllowance: +ba.toFixed(3),
+        bendDeduction: +bd.toFixed(3),
+        midpoint: c.midpoint,
+        axis: c.axis,
+        color: i % 2 === 0 ? 0xff3333 : 0xff8800,
+        edges: c.edges,
+      };
+    });
+
+    blankData = {
+      bends,
+      material: matKey,
+      thickness,
+      radius,
+      kFactor,
+      materialPreset: mat,
+    };
+
+    // Visualize bend lines
+    visualizeBendLines(bends);
+    renderBendList(bends);
+    showEl('sec-bends-wrap');
+
+    toast(`✅ Detected ${bends.length} bend${bends.length>1?'s':''}`, 3000);
+  }, 100);
+});
+
+// ── Visualize bend lines ───────────────────────────────────────────────
+function visualizeBendLines(bends) {
+  clearBendHelpers();
+  bends.forEach(b=>{
+    const len = 30;
+    const half = b.axis.clone().multiplyScalar(len/2);
+    const from = b.midpoint.clone().sub(half);
+    const to   = b.midpoint.clone().add(half);
+    const pts  = [from, to];
+    const geom = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat  = new THREE.LineBasicMaterial({ color: b.color, linewidth: 2, depthTest:false });
+    const line = new THREE.Line(geom, mat);
+    line.renderOrder = 999;
+    scene.add(line);
+    bendHelpers.push(line);
+
+    // Sphere at midpoint
+    const sg = new THREE.SphereGeometry(0.8, 8, 8);
+    const sm = new THREE.MeshBasicMaterial({ color: b.color, depthTest:false });
+    const sp = new THREE.Mesh(sg, sm);
+    sp.position.copy(b.midpoint);
+    sp.renderOrder = 999;
+    scene.add(sp);
+    bendHelpers.push(sp);
+  });
+}
+
+function clearBendHelpers() {
+  bendHelpers.forEach(h=>{scene.remove(h); h.geometry&&h.geometry.dispose(); h.material&&h.material.dispose();});
+  bendHelpers = [];
+}
+
+// ── Bend list UI ──────────────────────────────────────────────────────
+function renderBendList(bends) {
+  const list = $('bend-list');
+  list.innerHTML = '';
+  bends.forEach(b=>{
+    const div = document.createElement('div');
+    div.className = 'bend-item';
+    div.innerHTML = `
+      <div class="bend-item-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <div class="bend-dot" style="background:#${b.color.toString(16).padStart(6,'0')}"></div>
+        <span class="bend-label">Bend #${b.id}</span>
+        <span class="bend-angle">${b.angle}°</span>
+      </div>
+      <div class="bend-details">
+        <div class="bend-detail-row"><span>Angle</span><span class="bend-detail-val">${b.angle}°</span></div>
+        <div class="bend-detail-row"><span>Radius</span><span class="bend-detail-val">${b.radius} mm</span></div>
+        <div class="bend-detail-row"><span>K-Factor</span><span class="bend-detail-val">${b.kFactor}</span></div>
+        <div class="bend-detail-row"><span>Bend Allowance</span><span class="bend-detail-val">${b.bendAllowance} mm</span></div>
+        <div class="bend-detail-row"><span>Bend Deduction</span><span class="bend-detail-val">${b.bendDeduction} mm</span></div>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+// ── Generate flat blank ────────────────────────────────────────────────
+$('btn-generate-blank').addEventListener('click', () => {
+  if(!blankData || !blankData.bends || blankData.bends.length === 0) {
+    if(!modelMesh) { toast('⚠ Load a 3D model first'); return; }
+    toast('⚠ Run DETECT BENDS first'); return;
+  }
+
+  toast('▧ Generating flat pattern…', 1500);
+  setTimeout(()=>{
+    generateFlatPattern();
+  }, 100);
+});
+
+function generateFlatPattern() {
+  clearFlatMesh();
+
+  const bb = new THREE.Box3().setFromObject(modelMesh);
+  const size = new THREE.Vector3(); bb.getSize(size);
+  const bends = blankData.bends;
+  const thickness = blankData.thickness;
+  const kFactor = blankData.kFactor;
+  const radius = blankData.radius;
+
+  // Calculate total developed length (all faces + bend allowances)
+  const faceCount = bends.length + 1;
+  const totalBA = bends.reduce((s,b) => s + b.bendAllowance, 0);
+
+  // Estimate face segments (simplified: distribute size evenly + BA)
+  const baseWidth  = size.x;
+  const baseHeight = size.z;
+  // Developed length = sum of all face segments (size.y) + bend allowances (totalBA).
+  // size.y is used as the primary unfolding axis; bends are assumed perpendicular to Y.
+  const developedLength = size.y + totalBA;
+
+  // Build flat pattern geometry (simplified rectangular unfolding)
+  // Real unfolding would require full face graph traversal
+  const segments = buildUnfoldedSegments(bends, size, totalBA);
+
+  blankData.flatPattern = {
+    segments,
+    width:  +baseWidth.toFixed(2),
+    length: +developedLength.toFixed(2),
+    totalBA: +totalBA.toFixed(3),
+    area:   +(baseWidth * developedLength).toFixed(2),
+  };
+
+  // Render flat mesh in scene
+  const flatGeo = buildFlatGeometry(segments, baseWidth);
+  const flatMat2 = new THREE.MeshStandardMaterial({
+    color: 0x3fb950, roughness: 0.5, metalness: 0.3,
+    transparent: true, opacity: 0.75, side: THREE.DoubleSide,
+    wireframe: false,
+  });
+  flatMesh = new THREE.Mesh(flatGeo, flatMat2);
+
+  // Position flat mesh offset from model
+  const offset = size.x * 1.5;
+  flatMesh.position.set(offset, 0, 0);
+  scene.add(flatMesh);
+
+  // Update metrics
+  updateBlankMetrics(bends, blankData.flatPattern, blankData.materialPreset);
+
+  showEl('sec-blank-metrics-wrap');
+  showEl('sec-export-blank-wrap');
+
+  toast(`✅ Flat blank generated: ${blankData.flatPattern.width.toFixed(1)}×${blankData.flatPattern.length.toFixed(1)} mm`, 4000);
+}
+
+function buildUnfoldedSegments(bends, modelSize, totalBA) {
+  // Build sequential face segments for flat pattern
+  const segments = [];
+  const W = modelSize.x;
+  let curY = 0;
+
+  // Number of face strips = bends+1; estimate each face height
+  const totalH = modelSize.y + modelSize.z;
+  const segCount = bends.length + 1;
+
+  for(let i=0; i<segCount; i++){
+    const faceH = totalH / segCount;
+    segments.push({ y0: curY, y1: curY + faceH, width: W, type: 'face', index: i });
+    curY += faceH;
+    if(i < bends.length) {
+      const ba = bends[i].bendAllowance;
+      segments.push({ y0: curY, y1: curY + ba, width: W, type: 'bend', bendId: bends[i].id,
+        angle: bends[i].angle, ba, color: bends[i].color });
+      curY += ba;
+    }
+  }
+  return segments;
+}
+
+function buildFlatGeometry(segments, width) {
+  const positions = [];
+  const normals   = [];
+  const up = [0, 1, 0];
+  const totalLength = segments[segments.length-1].y1 || 1;
+  const centerOffset = totalLength / 2; // center the flat pattern around the origin
+  segments.forEach(seg=>{
+    const x0=-width/2, x1=width/2;
+    const z0 = seg.y0 - centerOffset;
+    const z1 = seg.y1 - centerOffset;
+    // Two triangles for each segment
+    [[x0,0,z0],[x1,0,z0],[x1,0,z1],[x0,0,z0],[x1,0,z1],[x0,0,z1]].forEach(v=>{
+      positions.push(...v); normals.push(...up);
+    });
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals,3));
+  return geo;
+}
+
+function clearFlatMesh() {
+  if(flatMesh) { scene.remove(flatMesh); flatMesh.geometry.dispose(); flatMesh.material.dispose(); flatMesh=null; }
+}
+
+function updateBlankMetrics(bends, pattern, matPreset) {
+  $('bm-w').textContent      = pattern.width.toFixed(1);
+  $('bm-h').textContent      = pattern.length.toFixed(1);
+  // Developed length = sum of all face segments + bend allowances; pattern.length already includes BA
+  $('bm-devlen').textContent = pattern.length.toFixed(2);
+  $('bm-bends').textContent  = bends.length;
+  $('bm-spring').textContent = matPreset ? matPreset.springBack : '—';
+  $('bm-area').textContent   = pattern.area.toFixed(1);
+}
+
+// ── 2D Layout View ─────────────────────────────────────────────────────
+$('btn-show-2d').addEventListener('click', () => {
+  if(!blankData || !blankData.flatPattern) { toast('⚠ Generate blank first'); return; }
+  render2DLayout();
+  $('modal2d').classList.add('show');
+});
+$('btn-modal-close').addEventListener('click', () => $('modal2d').classList.remove('show'));
+$('modal2d').addEventListener('click', e => { if(e.target===$('modal2d')) $('modal2d').classList.remove('show'); });
+
+function render2DLayout() {
+  const cv = $('canvas2d');
+  const ctx = cv.getContext('2d');
+  const pattern = blankData.flatPattern;
+  const segs = pattern.segments;
+
+  // Compute scale to fit canvas
+  const MARGIN = 40;
+  const scaleX = (cv.width - 2*MARGIN) / pattern.width;
+  const scaleY = (cv.height - 2*MARGIN) / (segs[segs.length-1].y1 || 1);
+  const scale  = Math.min(scaleX, scaleY);
+
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Draw segments
+  segs.forEach(seg => {
+    const x  = MARGIN;
+    const y  = MARGIN + seg.y0 * scale;
+    const w  = pattern.width * scale;
+    const h  = (seg.y1 - seg.y0) * scale;
+
+    if(seg.type === 'face') {
+      ctx.fillStyle = '#e8f4fd';
+      ctx.strokeStyle = '#1a5fb4';
+    } else {
+      // Bend zone
+      ctx.fillStyle = '#fff3cd';
+      ctx.strokeStyle = '#d97706';
+    }
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+
+    // Labels
+    ctx.fillStyle = '#333';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    if(seg.type === 'face') {
+      ctx.fillText(`FACE ${seg.index+1}`, x + w/2, y + h/2 + 4);
+    } else {
+      ctx.fillStyle = '#b45309';
+      ctx.fillText(`BEND #${seg.bendId} (${seg.angle}°) BA=${seg.ba.toFixed(2)}mm`, x+w/2, y+h/2+4);
+    }
+  });
+
+  // Dimension arrows & labels
+  ctx.strokeStyle = '#555';
+  ctx.fillStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+
+  const totalH = (segs[segs.length-1].y1 || 1) * scale;
+  // Width dim
+  drawDimArrow(ctx, MARGIN, MARGIN - 18, MARGIN + pattern.width*scale, MARGIN - 18, `${pattern.width.toFixed(1)} mm`);
+  // Height dim
+  drawDimArrow(ctx, MARGIN - 22, MARGIN, MARGIN - 22, MARGIN + totalH, `${pattern.length.toFixed(1)} mm`, true);
+
+  // Title block
+  ctx.fillStyle = '#0d1117';
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('FURY — FLAT BLANK PATTERN', MARGIN, cv.height - 22);
+  ctx.font = '10px monospace';
+  ctx.fillStyle = '#555';
+  ctx.fillText(`Material: ${blankData.materialPreset.name}  |  Thickness: ${blankData.thickness}mm  |  K=${blankData.kFactor}  |  Bends: ${blankData.bends.length}`, MARGIN, cv.height - 8);
+
+  // Update badges
+  const badges = $('modal2d-badges');
+  badges.innerHTML = `
+    <span class="badge green">✓ ${blankData.bends.length} BENDS</span>
+    <span class="badge orange">⊡ ${pattern.width.toFixed(0)}×${pattern.length.toFixed(0)}mm</span>`;
+}
+
+function drawDimArrow(ctx, x1,y1,x2,y2, label, vertical=false) {
+  ctx.beginPath();
+  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.stroke();
+  // Arrowheads
+  const L=6;
+  if(!vertical){
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1+L,y1-3); ctx.lineTo(x1+L,y1+3); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-L,y2-3); ctx.lineTo(x2-L,y2+3); ctx.fill();
+    ctx.fillStyle='#333'; ctx.textAlign='center'; ctx.font='10px monospace';
+    ctx.fillText(label, (x1+x2)/2, y1-4);
+  } else {
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1-3,y1+L); ctx.lineTo(x1+3,y1+L); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-3,y2-L); ctx.lineTo(x2+3,y2-L); ctx.fill();
+    ctx.save(); ctx.translate(x1-6, (y1+y2)/2); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle='#333'; ctx.textAlign='center'; ctx.font='10px monospace';
+    ctx.fillText(label, 0, 0); ctx.restore();
+  }
+}
+
+// ── Animation ─────────────────────────────────────────────────────────
+$('btn-animate').addEventListener('click', () => {
+  if(!blankData || !blankData.flatPattern) { toast('⚠ Generate blank first'); return; }
+  if(!flatMesh) { toast('⚠ Generate blank first'); return; }
+  // Pre-enable transparency on all helpers so animation can adjust opacity freely
+  bendHelpers.forEach(h=>{ if(h.material) h.material.transparent = true; });
+  flatMesh.material.transparent = true;
+  $('anim-bar').classList.add('show');
+  animActive = true;
+  animT = 0;
+  $('anim-slider').value = 0;
+  $('anim-pct').textContent = '0%';
+  toast('▶ Unfolding animation – drag slider or press Play');
+});
+
+$('anim-close').addEventListener('click',()=>{ $('anim-bar').classList.remove('show'); animPlaying=false; animActive=false; updateAnimState(0); });
+$('anim-play').addEventListener('click',()=>{ animPlaying=!animPlaying; $('anim-play').textContent=animPlaying?'⏸':'▶'; });
+$('anim-rev').addEventListener('click',()=>{ animDir=-1; animPlaying=true; $('anim-play').textContent='⏸'; });
+$('anim-fwd').addEventListener('click',()=>{ animDir=1; animPlaying=true; $('anim-play').textContent='⏸'; });
+$('anim-slider').addEventListener('input',()=>{
+  animT = +$('anim-slider').value / 100;
+  $('anim-pct').textContent = $('anim-slider').value + '%';
+  updateAnimState(animT);
+});
+
+function tickAnimation() {
+  animT = Math.max(0, Math.min(1, animT + animDir * 0.008));
+  $('anim-slider').value = Math.round(animT*100);
+  $('anim-pct').textContent = Math.round(animT*100) + '%';
+  updateAnimState(animT);
+  if(animT >= 1 || animT <= 0) { animPlaying=false; $('anim-play').textContent='▶'; }
+}
+
+/*
+  Unfolding animation:
+  - t=0: original model (formed)
+  - t=1: flat pattern
+  Interpolate geometry vertices between formed and flat positions.
+  For simplicity, blend the flat mesh opacity and position offset,
+  and scale/rotate the original mesh to simulate unfolding.
+*/
+function updateAnimState(t) {
+  if(!modelMesh || !flatMesh) return;
+
+  // Formed model fades out as t increases
+  modelMesh.material.opacity = 1 - t * 0.85;
+  modelMesh.material.transparent = t > 0;
+
+  // Flat mesh fades in
+  flatMesh.material.opacity = t * 0.85;
+
+  // Animate flat mesh coming down from above
+  const bb = new THREE.Box3().setFromObject(modelMesh);
+  const size = new THREE.Vector3(); bb.getSize(size);
+  const offsetX = size.x * 1.5;
+  const offsetY = (1 - t) * size.y * 2;
+  flatMesh.position.set(offsetX, offsetY, 0);
+
+  // Bend helpers fade out (transparent flag already set when animation was started)
+  bendHelpers.forEach((h)=>{ if(h.material) h.material.opacity = 1-t; });
+}
+
+// ── Reset blank ────────────────────────────────────────────────────────
+$('btn-reset-blank').addEventListener('click', () => {
+  clearBendHelpers();
+  clearFlatMesh();
+  blankData = null;
+  hideEl('sec-bends-wrap');
+  hideEl('sec-blank-metrics-wrap');
+  hideEl('sec-export-blank-wrap');
+  $('anim-bar').classList.remove('show');
+  animPlaying = false; animActive = false;
+  $('bend-list').innerHTML = '';
+  if(modelMesh){
+    modelMesh.material.opacity = 1;
+    modelMesh.material.transparent = false;
+  }
+  toast('✅ Blank reset');
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  EXPORT FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+// ── DXF export ────────────────────────────────────────────────────────
+function generateDXF() {
+  if(!blankData || !blankData.flatPattern) { toast('⚠ Generate blank first'); return ''; }
+  const p = blankData.flatPattern;
+  const segs = p.segments;
+  let dxf = `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n`;
+
+  // Outer boundary
+  const addLine = (x1,y1,x2,y2,layer='0') =>
+    `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n30\n0.0\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n31\n0.0\n`;
+
+  const W = p.width;
+  const H = segs[segs.length-1].y1 || 0;
+
+  // Outer rectangle
+  dxf += addLine(0,0,W,0,'OUTLINE');
+  dxf += addLine(W,0,W,H,'OUTLINE');
+  dxf += addLine(W,H,0,H,'OUTLINE');
+  dxf += addLine(0,H,0,0,'OUTLINE');
+
+  // Bend lines
+  segs.forEach(seg=>{
+    if(seg.type==='bend'){
+      dxf += addLine(0,seg.y0,W,seg.y0,'BEND');
+      dxf += addLine(0,seg.y1,W,seg.y1,'BEND');
+    }
+  });
+
+  dxf += `0\nENDSEC\n0\nEOF\n`;
+  return dxf;
+}
+
+$('btn-export-dxf').addEventListener('click', exportDXF);
+$('btn-modal-dxf').addEventListener('click', exportDXF);
+function exportDXF() {
+  const dxf = generateDXF();
+  if(!dxf) return;
+  const blob = new Blob([dxf],{type:'text/plain'});
+  const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'blank_pattern.dxf'});
+  a.click();
+  toast('✅ DXF exported');
+}
+
+// ── JSON export ────────────────────────────────────────────────────────
+$('btn-export-json').addEventListener('click', () => {
+  if(!blankData) { toast('⚠ Generate blank first'); return; }
+  const data = {
+    material: blankData.material,
+    materialName: blankData.materialPreset.name,
+    thickness: blankData.thickness,
+    kFactor: blankData.kFactor,
+    bendRadius: blankData.radius,
+    bends: blankData.bends.map(b=>({
+      id: b.id, angle: b.angle, radius: b.radius,
+      kFactor: b.kFactor, bendAllowance: b.bendAllowance, bendDeduction: b.bendDeduction,
+      position: { x:+b.midpoint.x.toFixed(3), y:+b.midpoint.y.toFixed(3), z:+b.midpoint.z.toFixed(3) },
+      axis: { x:+b.axis.x.toFixed(3), y:+b.axis.y.toFixed(3), z:+b.axis.z.toFixed(3) },
+    })),
+    flatPattern: blankData.flatPattern ? {
+      width: blankData.flatPattern.width,
+      length: blankData.flatPattern.length,
+      totalBendAllowance: blankData.flatPattern.totalBA,
+      area: blankData.flatPattern.area,
+    } : null,
+    springBackEstimate: blankData.materialPreset.springBack,
+    generatedAt: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'blank_data.json'});
+  a.click();
+  toast('✅ JSON exported');
+});
+
+// ── PDF Report ─────────────────────────────────────────────────────────
+$('btn-export-pdf').addEventListener('click', () => {
+  if(!blankData) { toast('⚠ Generate blank first'); return; }
+  // Generate PDF-ready HTML and print
+  const p = blankData.flatPattern;
+  const bends = blankData.bends;
+  const mat = blankData.materialPreset;
+
+  const html = `
+    <html><head><title>FURY Blank Pattern Report</title>
+    <style>
+      body{font-family:monospace;font-size:11px;margin:20px;color:#111}
+      h1{font-size:16px;border-bottom:2px solid #333;padding-bottom:6px}
+      h2{font-size:13px;margin-top:20px;color:#1a5fb4}
+      table{width:100%;border-collapse:collapse;margin:8px 0}
+      th,td{border:1px solid #ccc;padding:5px 8px;text-align:left}
+      th{background:#e8f4fd}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      .box{border:1px solid #ccc;border-radius:4px;padding:8px;background:#f9f9f9}
+    </style></head>
+    <body>
+    <h1>▧ FURY 3D – Blank Component Pattern Report</h1>
+    <div class="meta">
+      <div class="box"><b>Material:</b> ${mat.name}<br><b>Thickness:</b> ${blankData.thickness} mm<br><b>K-Factor:</b> ${blankData.kFactor}<br><b>Bend Radius:</b> ${blankData.radius} mm</div>
+      <div class="box">${p?`<b>Blank Width:</b> ${p.width.toFixed(2)} mm<br><b>Blank Length:</b> ${p.length.toFixed(2)} mm<br><b>Flat Area:</b> ${p.area.toFixed(1)} mm²<br><b>Total BA:</b> ${p.totalBA.toFixed(3)} mm`:''}</div>
+    </div>
+    <h2>Bend Analysis</h2>
+    <table><tr><th>#</th><th>Angle (°)</th><th>Radius (mm)</th><th>Bend Allow. (mm)</th><th>Bend Deduct. (mm)</th></tr>
+    ${bends.map(b=>`<tr><td>${b.id}</td><td>${b.angle}</td><td>${b.radius}</td><td>${b.bendAllowance}</td><td>${b.bendDeduction}</td></tr>`).join('')}
+    </table>
+    <h2>Spring-back Estimate</h2>
+    <p>${mat.springBack} (based on ${mat.name})</p>
+    <p style="margin-top:30px;font-size:9px;color:#999">Generated by FURY v1.3 · ${new Date().toLocaleString()}</p>
+    </body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:none;';
+  iframe.src = blobUrl;
+  // Clean up blob URL as soon as the print dialog is dismissed
+  const cleanup = () => { try { document.body.removeChild(iframe); } catch(e){} URL.revokeObjectURL(blobUrl); };
+  document.body.appendChild(iframe);
+  iframe.addEventListener('load', () => {
+    try {
+      iframe.contentWindow.print();
+      iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+    } catch(e) {
+      window.open(blobUrl, '_blank');
+    }
+    // Fallback cleanup in case afterprint never fires (e.g. popup blocked)
+    setTimeout(cleanup, 30000);
+  });
+  toast('✅ PDF report opened');
+});
+
+// ── Flat PNG export ────────────────────────────────────────────────────
+$('btn-export-flat-png').addEventListener('click', () => {
+  if(!blankData || !blankData.flatPattern) { toast('⚠ Generate blank first'); return; }
+  render2DLayout();
+  $('canvas2d').toBlob(blob=>{
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'flat_pattern.png'});
+    a.click();
+  });
+  toast('✅ Flat PNG exported');
+});
+$('btn-modal-png').addEventListener('click', ()=>{
+  $('canvas2d').toBlob(blob=>{
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'flat_pattern.png'});
+    a.click();
+  });
+  toast('✅ PNG exported');
+});
+
+// ── Initial blank mode state ───────────────────────────────────────────
+$('btn-blank-mode').classList.add('active');
+$('tb-blank').classList.add('active');
+
+</script>
+</body>
+</html>
