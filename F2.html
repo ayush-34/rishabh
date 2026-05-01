@@ -353,7 +353,7 @@
       <div id="drop-overlay">
         <div id="drop-icon">📂</div>
         <div id="drop-text">DROP FILE HERE</div>
-        <div id="drop-sub">STL · OBJ · GLB · GLTF · STEP</div>
+        <div id="drop-sub">STL · OBJ · GLB · GLTF</div>
       </div>
 
       <!-- Upload placeholder -->
@@ -532,6 +532,7 @@ const controls = new OrbitControls(camera, canvas);
 
 // ── App state ────────────────────────────────────────────────────────
 let modelMesh    = null;
+let modelScaleFactor = 1; // tracks scale applied during import for unit conversion
 let blankMode    = true;
 let wireframe    = false;
 let blankData    = null;
@@ -634,6 +635,7 @@ function addModelToScene(geometry, fileName) {
   bb.getSize(size);
   const maxDim = Math.max(size.x, size.y, size.z);
   const scale = 60 / maxDim;
+  modelScaleFactor = scale;
   geometry.scale(scale, scale, scale);
   geometry.computeBoundingBox();
   geometry.computeVertexNormals();
@@ -667,11 +669,14 @@ function loadSTL(buffer) {
 
 function parseSTL(buffer) {
   const view = new DataView(buffer);
-  // Detect ASCII STL by checking for 'solid' keyword at the start
+  // Robust ASCII STL detection: check for 'solid' keyword AND verify that the
+  // buffer byteLength does not match the expected binary format (numTri*50+84).
+  // A binary STL can accidentally begin with "solid", so we require both checks.
   const startBytes = new Uint8Array(buffer, 0, 256);
   const startText = new TextDecoder('utf-8', { fatal: false }).decode(startBytes);
+  const expectedBinarySize = view.getUint32(80, true) * 50 + 84;
   const isASCII = startText.trimStart().startsWith('solid') &&
-    (view.getUint32(80, true) * 50 + 84 !== buffer.byteLength);
+    (expectedBinarySize !== buffer.byteLength);
   const geo = new THREE.BufferGeometry();
   const positions = [];
   const normals = [];
@@ -785,7 +790,9 @@ function updateMetrics(geo, size) {
   const vCount = pos.count;
   const fCount = geo.index ? geo.index.count/3 : vCount/3;
 
-  // Surface area
+  // Surface area: computed in scene units², converted to mm² via scale factor.
+  // modelScaleFactor = 60/maxDim, so 1 scene unit = (1/modelScaleFactor) mm,
+  // and 1 scene unit² = 1/(modelScaleFactor²) mm².
   let area = 0;
   const vA=new THREE.Vector3(), vB=new THREE.Vector3(), vC=new THREE.Vector3(), cross=new THREE.Vector3();
   for(let i=0; i<vCount; i+=3) {
@@ -793,17 +800,11 @@ function updateMetrics(geo, size) {
     cross.crossVectors(vB.clone().sub(vA), vC.clone().sub(vA));
     area += cross.length() * 0.5;
   }
-  // Compute surface area in scene-space units, then convert to mm² using the
-  // inverse of the scale factor applied during model import (scale = 60 / maxDim).
-  // size already carries the model's real mm dimensions after scaling, so we
-  // derive the unit-to-mm conversion ratio from the bounding box.
-  const bbSize = new THREE.Vector3(); modelMesh && modelMesh.geometry.boundingBox
-    ? modelMesh.geometry.boundingBox.getSize(bbSize) : bbSize.set(1,1,1);
-  // area is in scene units²; the model was scaled so that maxDim == 60 scene units
-  // equals the actual mm dimension in `size`. Use size/bbSize ratio to convert.
+  const sceneToMmSq = 1 / (modelScaleFactor ** 2);
+  const areaMm2 = area * sceneToMmSq;
   $('m-verts').textContent = vCount.toLocaleString();
   $('m-faces').textContent = Math.round(fCount).toLocaleString();
-  $('m-area').textContent  = (area).toFixed(1);
+  $('m-area').textContent  = areaMm2.toFixed(1);
   $('m-bbx').textContent   = size.x.toFixed(1);
   $('m-bby').textContent   = size.y.toFixed(1);
   $('m-bbz').textContent   = size.z.toFixed(1);
@@ -989,9 +990,10 @@ function detectBends(geometry) {
   }
 
   // Build edge → faces map
+  // Use integer-rounded keys (×1000 = 0.001 precision) for fast hashing
   const edgeMap = new Map();
-  const vKey = (v) => `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`;
-  const eKey = (a,b) => { const ka=vKey(a),kb=vKey(b); return ka<kb?`${ka}|${kb}`:`${kb}|${ka}`; };
+  const vertexKey = (v) => `${Math.round(v.x*1000)},${Math.round(v.y*1000)},${Math.round(v.z*1000)}`;
+  const eKey = (a,b) => { const ka=vertexKey(a),kb=vertexKey(b); return ka<kb?`${ka}|${kb}`:`${kb}|${ka}`; };
   faces.forEach((f,fi)=>{
     const edges = [[f.vA,f.vB],[f.vB,f.vC],[f.vC,f.vA]];
     edges.forEach(([v0,v1])=>{
@@ -1020,16 +1022,18 @@ function detectBends(geometry) {
   });
 
   // Cluster nearby bend edges into bend lines
-  const CLUSTER_DIST = 5; // merge edges within 5 units
+  const BEND_CLUSTER_DISTANCE = 5; // maximum distance (scene units) for merging bend edges
   const clusters = [];
   bendEdges.forEach(e=>{
     let found = false;
     for(const c of clusters) {
-      if(c.midpoint.distanceTo(e.midpoint) < CLUSTER_DIST &&
+      if(c.midpoint.distanceTo(e.midpoint) < BEND_CLUSTER_DISTANCE &&
          Math.abs(c.axis.dot(e.axis)) > 0.85) {
         c.edges.push(e);
-        c.midpoint.add(e.midpoint).divideScalar(2);
-        c.totalAngle = (c.totalAngle + Math.abs(e.dihedral)) / 2;
+        // Incremental/online mean: update running average without recomputing full sum
+        const n = c.edges.length;
+        c.midpoint.multiplyScalar((n-1)/n).addScaledVector(e.midpoint, 1/n);
+        c.totalAngle = (c.totalAngle * (n-1) + Math.abs(e.dihedral)) / n;
         found = true; break;
       }
     }
@@ -1207,6 +1211,8 @@ function generateFlatPattern() {
   // Estimate face segments (simplified: distribute size evenly + BA)
   const baseWidth  = size.x;
   const baseHeight = size.z;
+  // Developed length = sum of all face segments (size.y) + bend allowances (totalBA).
+  // size.y is used as the primary unfolding axis; bends are assumed perpendicular to Y.
   const developedLength = size.y + totalBA;
 
   // Build flat pattern geometry (simplified rectangular unfolding)
@@ -1296,7 +1302,8 @@ function clearFlatMesh() {
 function updateBlankMetrics(bends, pattern, matPreset) {
   $('bm-w').textContent      = pattern.width.toFixed(1);
   $('bm-h').textContent      = pattern.length.toFixed(1);
-  $('bm-devlen').textContent = (pattern.length + pattern.totalBA).toFixed(2);
+  // Developed length = sum of all face segments + bend allowances; pattern.length already includes BA
+  $('bm-devlen').textContent = pattern.length.toFixed(2);
   $('bm-bends').textContent  = bends.length;
   $('bm-spring').textContent = matPreset ? matPreset.springBack : '—';
   $('bm-area').textContent   = pattern.area.toFixed(1);
@@ -1411,6 +1418,9 @@ function drawDimArrow(ctx, x1,y1,x2,y2, label, vertical=false) {
 $('btn-animate').addEventListener('click', () => {
   if(!blankData || !blankData.flatPattern) { toast('⚠ Generate blank first'); return; }
   if(!flatMesh) { toast('⚠ Generate blank first'); return; }
+  // Pre-enable transparency on all helpers so animation can adjust opacity freely
+  bendHelpers.forEach(h=>{ if(h.material) h.material.transparent = true; });
+  flatMesh.material.transparent = true;
   $('anim-bar').classList.add('show');
   animActive = true;
   animT = 0;
@@ -1462,8 +1472,8 @@ function updateAnimState(t) {
   const offsetY = (1 - t) * size.y * 2;
   flatMesh.position.set(offsetX, offsetY, 0);
 
-  // Bend helpers fade out — must enable transparency before adjusting opacity
-  bendHelpers.forEach((h,i)=>{ if(h.material) { h.material.transparent = true; h.material.opacity = 1-t; } });
+  // Bend helpers fade out (transparent flag already set when animation was started)
+  bendHelpers.forEach((h)=>{ if(h.material) h.material.opacity = 1-t; });
 }
 
 // ── Reset blank ────────────────────────────────────────────────────────
@@ -1596,8 +1606,24 @@ $('btn-export-pdf').addEventListener('click', () => {
     <p style="margin-top:30px;font-size:9px;color:#999">Generated by FURY v1.3 · ${new Date().toLocaleString()}</p>
     </body></html>`;
 
-  const win = window.open('','_blank','width=700,height=900');
-  if(win){ win.document.write(html); win.document.close(); setTimeout(()=>win.print(),500); }
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:none;';
+  iframe.src = blobUrl;
+  // Clean up blob URL as soon as the print dialog is dismissed
+  const cleanup = () => { try { document.body.removeChild(iframe); } catch(e){} URL.revokeObjectURL(blobUrl); };
+  document.body.appendChild(iframe);
+  iframe.addEventListener('load', () => {
+    try {
+      iframe.contentWindow.print();
+      iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+    } catch(e) {
+      window.open(blobUrl, '_blank');
+    }
+    // Fallback cleanup in case afterprint never fires (e.g. popup blocked)
+    setTimeout(cleanup, 30000);
+  });
   toast('✅ PDF report opened');
 });
 
